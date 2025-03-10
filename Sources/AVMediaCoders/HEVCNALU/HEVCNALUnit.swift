@@ -1,4 +1,4 @@
-enum HEVCNALUnitType: UInt8, Equatable {
+public enum HEVCNALUnitType: UInt8, Equatable {
   //Coded slice segment
   case trialN = 0
   case trailR = 1
@@ -50,10 +50,13 @@ enum HEVCNALUnitType: UInt8, Equatable {
   case unspecified = 48
 }
 
-struct HEVCNALUnitHeader: Equatable {
+public struct HEVCNALUnitHeader: Equatable {
   let type: HEVCNALUnitType
   let layerID: UInt8
   let temporalIDPlus1: UInt8
+  var isKeyFrame: Bool {
+    type == .cra || type == .idrWRadl || type == .idrNLp
+  }
 
   var bytes: [UInt8] {
     [type.rawValue << 1 | (layerID & 0b00111111) >> 5, layerID << 3 | temporalIDPlus1]
@@ -83,7 +86,7 @@ struct HEVCNALUnitHeader: Equatable {
   }
 }
 
-struct HEVCNALUnit {
+public struct HEVCNALUnit {
   let header: HEVCNALUnitHeader
   let payload: [UInt8]
 
