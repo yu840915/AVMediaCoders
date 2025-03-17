@@ -16,7 +16,28 @@ extension CMSampleBuffer {
         nalUnitHeaderLengthOut: nil
       )
     )
-    return try Array(0..<count).map { try getHEVCParameterSet(at: $0, from: formatDescription) }
+    let nalus = try Array(0..<count).map {
+      try getHEVCParameterSet(at: $0, from: formatDescription)
+    }
+    let datas = nalus.map { $0.bytes }
+    let sizes = datas.map { $0.count }
+    let pointer = datas.map {
+      $0.withUnsafeBufferPointer { $0 }.baseAddress!
+    }
+    var formatDescriptionOut: CMFormatDescription?
+    try ensureSuccess(
+      osStatus: CMVideoFormatDescriptionCreateFromHEVCParameterSets(
+        allocator: kCFAllocatorDefault,
+        parameterSetCount: sizes.count,
+        parameterSetPointers: pointer,
+        parameterSetSizes: sizes,
+        nalUnitHeaderLength: 4,
+        extensions: nil,
+        formatDescriptionOut: &formatDescriptionOut
+      )
+    )
+    assert(formatDescriptionOut != nil)
+    return nalus
   }
 
   private func getHEVCParameterSet(
@@ -41,7 +62,9 @@ extension CMSampleBuffer {
     guard let pointer else {
       throw AVMediaCodersError.missingBuffer
     }
-    return try HEVCNALUnit(bytes: [UInt8](Data(bytes: pointer, count: size)))
+    let retVal = try HEVCNALUnit(bytes: [UInt8](Data(bytes: pointer, count: size)))
+    assert(retVal.bytes == [UInt8](Data(bytes: pointer, count: size)))
+    return retVal
   }
 
   func getHEVCDataNALUnits() throws -> [HEVCNALUnit] {
@@ -64,18 +87,26 @@ extension CMSampleBuffer {
     }
     var nalus: [HEVCNALUnit] = []
     var offset = 0
+    let bufBytes = [Int8](UnsafeMutableBufferPointer<Int8>(start: bufPtr, count: bufSize))
+      .map { UInt8(bitPattern: $0) }
 
     while offset < bufSize {
       // Read the NALU length (4 bytes)
       var naluLength: UInt32 = 0
-      memcpy(&naluLength, bufPtr + offset, 4)
+      var lenBytes = [UInt8](bufBytes[offset..<offset + 4])
+      memcpy(&naluLength, &lenBytes, 4)
       naluLength = CFSwapInt32BigToHost(naluLength)  // Convert to host byte order
       offset += 4
 
       // Read the NALU data
 
-      let naluData = Data(bytes: bufPtr + offset, count: Int(naluLength))
-      nalus.append(try HEVCNALUnit(bytes: [UInt8](naluData)))
+      nalus.append(
+        try HEVCNALUnit(
+          bytes: Array(
+            bufBytes[offset..<offset + Int(naluLength)]
+          )
+        )
+      )
       offset += Int(naluLength)
     }
     return nalus

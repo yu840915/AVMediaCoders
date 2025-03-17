@@ -14,23 +14,11 @@ let package = Package(
             name: "AVMediaCoders",
             targets: ["AVMediaCoders"])
     ],
-    dependencies: [
-        .package(
-            name: "RemoteCameraCore",
-            path: "file:///Users/lixuanyu/swift_proj.nosync/RemoteCameraCore"
-        ),
-        .package(
-            name: "AsyncUtils",
-            path: "file:///Users/lixuanyu/swift_proj.nosync/AsyncUtils"
-        ),
-    ],
+    dependencies: [],
     targets: [
         .target(
             name: "AVMediaCoders",
-            dependencies: [
-                "RemoteCameraCore",
-                "AsyncUtils",
-            ]
+            dependencies: []
         ),
         .testTarget(
             name: "AVMediaCodersTests",

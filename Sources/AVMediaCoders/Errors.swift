@@ -7,6 +7,8 @@ enum AVMediaCodersError: Error, Equatable {
   case frameDropped
   case missingBuffer
   case invalidHEVC(HEVCNALUnitError)
+  case invalidISOTimestampPrefix
+  case bufferTooShort
 }
 
 func ensureSuccess(osStatus status: @autoclosure () -> OSStatus) throws {

@@ -28,14 +28,16 @@ public enum HEVCNALUnitType: UInt8, Equatable {
   //Reserved IRAP
   case rsvIrapVclN22 = 22
   case rsvIrapVclR23 = 23
-  //Metadata
+  //Parametersets
   case vps = 32
   case sps = 33
   case pps = 34
+  //Controls
   case aud = 35
   case eos = 36
   case eob = 37
   case fillerData = 38
+  //Parametersets
   case prefixSEI = 39
   case suffixSEI = 40
   //Reserved non-VCL
@@ -50,13 +52,25 @@ public enum HEVCNALUnitType: UInt8, Equatable {
   case unspecified = 48
 }
 
-public struct HEVCNALUnitHeader: Equatable {
-  let type: HEVCNALUnitType
-  let layerID: UInt8
-  let temporalIDPlus1: UInt8
-  var isKeyFrame: Bool {
-    type == .cra || type == .idrWRadl || type == .idrNLp
+extension HEVCNALUnitType {
+  var isFormatDescription: Bool {
+    switch self {
+    case .vps, .sps, .pps, .prefixSEI, .suffixSEI: true
+    default: false
+    }
   }
+
+  var isKeyFrame: Bool {
+    switch self {
+    case .cra, .idrWRadl, .idrNLp: true
+    default: false
+    }
+  }
+}
+public struct HEVCNALUnitHeader: Equatable {
+  public let type: HEVCNALUnitType
+  public let layerID: UInt8
+  public let temporalIDPlus1: UInt8
 
   var bytes: [UInt8] {
     [type.rawValue << 1 | (layerID & 0b00111111) >> 5, layerID << 3 | temporalIDPlus1]
@@ -87,8 +101,14 @@ public struct HEVCNALUnitHeader: Equatable {
 }
 
 public struct HEVCNALUnit {
-  let header: HEVCNALUnitHeader
-  let payload: [UInt8]
+  public let header: HEVCNALUnitHeader
+  public let payload: [UInt8]
+  var isKeyFrame: Bool {
+    header.type.isKeyFrame
+  }
+  var isFormatDescription: Bool {
+    header.type.isFormatDescription
+  }
 
   var bytes: [UInt8] {
     header.bytes + payload
