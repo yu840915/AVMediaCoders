@@ -7,6 +7,7 @@ enum AVMediaCodersError: Error, Equatable {
   case frameDropped
   case missingBuffer
   case invalidHEVC(HEVCNALUnitError)
+  case invalidPES(PESError)
   case invalidISOTimestampPrefix
   case bufferTooShort
 }
@@ -22,4 +23,10 @@ enum HEVCNALUnitError: Error, Equatable {
   case invalidNALUnitHeaderLength
   case nonZeroForbiddenBit
   case invalidNALUnitType
+}
+
+enum PESError: Error, Equatable {
+  case invalidMarkerBit
+  case invalidScramblingControl
+  case invalidPtsDtsFlag
 }

@@ -1,8 +1,9 @@
+import CoreMedia
 import Testing
 
 @testable import AVMediaCoders
 
-struct MediaTimestampTests {
+struct ISOMediaTimestampTests {
   @Test("Valid values", arguments: [0, 42, 0x1_FFFF_FFFF])
   func initWithValues(value: UInt64) async throws {
     let sut = ISOMediaTimestamp(prefix: .pts, truncating: value)
@@ -35,5 +36,34 @@ struct MediaTimestampTests {
     let decoded = try ISOMediaTimestamp(bytes: bytes)
 
     #expect(sut == decoded)
+  }
+
+  @Test("Prefix values", arguments: [ISOMediaTimestamp.Prefix.pts, .ptsPrecedingDts, .dts])
+  func encodeAndDecoePrefix(prefix: ISOMediaTimestamp.Prefix) async throws {
+    let sut = ISOMediaTimestamp(prefix: prefix, truncating: 123_456_789)
+    let bytes = sut.bytes
+    let decoded = try ISOMediaTimestamp(bytes: bytes)
+
+    #expect(sut == decoded)
+  }
+
+  @Test
+  func convertFromCMTime() async throws {
+    let time = CMTime(value: 123_456_789, timescale: 90000)
+
+    let sut = ISOMediaTimestamp(prefix: .pts, videoTime: time)
+    let restored = sut.videoCMTime
+
+    #expect(restored == CMTime(value: 123_456_789, timescale: 90000))
+  }
+
+  @Test
+  func convertFromCMTimeWithDifferentTimescale() async throws {
+    let time = CMTime(value: 42, timescale: 45000)
+
+    let sut = ISOMediaTimestamp(prefix: .pts, videoTime: time)
+    let restored = sut.videoCMTime
+
+    #expect(restored == CMTime(value: 84, timescale: 90000))
   }
 }
