@@ -29,4 +29,6 @@ enum PESError: Error, Equatable {
   case invalidMarkerBit
   case invalidScramblingControl
   case invalidPtsDtsFlag
+  case headerDataTooShort
+  case conflictingPtsDtsFlag
 }
