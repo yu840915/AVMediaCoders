@@ -26,9 +26,11 @@ enum HEVCNALUnitError: Error, Equatable {
 }
 
 enum PESError: Error, Equatable {
+  case invalidStartCode
   case invalidMarkerBit
   case invalidScramblingControl
   case invalidPtsDtsFlag
   case headerDataTooShort
   case conflictingPtsDtsFlag
+  case invalidStreamID
 }

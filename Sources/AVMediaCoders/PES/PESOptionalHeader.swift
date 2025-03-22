@@ -1,6 +1,7 @@
 import CoreMedia
 
-struct PESOptionalHeader: Equatable {
+/// PES Optional Header
+struct PESHeaderExtension: Equatable {
   var scramblingControl: ScramblingControl {
     flags.scramblingControl
   }
@@ -14,7 +15,7 @@ struct PESOptionalHeader: Equatable {
     flags.isOriginal
   }
   let ptsAndDts: PtsAndDts
-  let flags: PESOptionalHeaderFlags
+  let flags: PESHeaderExtensionFlags
 
   let bytes: [UInt8]
 
@@ -27,7 +28,7 @@ struct PESOptionalHeader: Equatable {
   ) {
     self.ptsAndDts = ptsAndDts
     let dataBytes = ptsAndDts.bytes
-    var flags = PESOptionalHeaderFlags()
+    var flags = PESHeaderExtensionFlags()
     flags.scramblingControl = scramblingControl
     flags.dataAlignmentIndicator = dataAlignmentIndicator
     flags.copyRight = copyRight
@@ -39,8 +40,7 @@ struct PESOptionalHeader: Equatable {
   }
 
   init(bytes: [UInt8]) throws {
-    let flags = try PESOptionalHeaderFlags(bytes: bytes)
-    self.bytes = bytes
+    let flags = try PESHeaderExtensionFlags(bytes: bytes)
     self.flags = flags
     let dataBytes = Array(bytes.suffix(from: 3))
     guard dataBytes.count >= flags.headerDataLength else {
@@ -50,10 +50,11 @@ struct PESOptionalHeader: Equatable {
       flag: flags.ptsAndDts,
       bytes: Array(dataBytes.prefix(Int(flags.headerDataLength)))
     )
+    self.bytes = flags.bytes + ptsAndDts.bytes
   }
 }
 
-extension PESOptionalHeader {
+extension PESHeaderExtension {
   enum ScramblingControl: UInt8, Equatable {
     case notScrambling = 0b00
     case reserved = 0b01
@@ -66,7 +67,7 @@ extension PESOptionalHeader {
     case pts(CMTime)
     case ptsAndDts(pts: CMTime, dts: CMTime)
 
-    func toFlag() -> PESOptionalHeaderFlags.PtsDtsFlag {
+    func toFlag() -> PESHeaderExtensionFlags.PtsDtsFlag {
       switch self {
       case .none: .none
       case .pts: .pts
@@ -86,8 +87,8 @@ extension PESOptionalHeader {
   }
 }
 
-extension PESOptionalHeader.PtsAndDts {
-  init(flag: PESOptionalHeaderFlags.PtsDtsFlag, bytes: [UInt8]) throws {
+extension PESHeaderExtension.PtsAndDts {
+  init(flag: PESHeaderExtensionFlags.PtsDtsFlag, bytes: [UInt8]) throws {
     switch flag {
     case .none:
       self = .none
@@ -119,8 +120,8 @@ extension PESOptionalHeader.PtsAndDts {
   }
 }
 
-struct PESOptionalHeaderFlags: Equatable {
-  var scramblingControl: PESOptionalHeader.ScramblingControl = .notScrambling
+struct PESHeaderExtensionFlags: Equatable {
+  var scramblingControl: PESHeaderExtension.ScramblingControl = .notScrambling
   var priority: Bool = false
   var dataAlignmentIndicator: Bool = false
   var copyRight: Bool = false
@@ -148,7 +149,7 @@ struct PESOptionalHeaderFlags: Equatable {
       throw AVMediaCodersError.invalidPES(.invalidMarkerBit)
     }
     guard
-      let scramblingControl = PESOptionalHeader.ScramblingControl(
+      let scramblingControl = PESHeaderExtension.ScramblingControl(
         rawValue: (part1 & 0b0011_0000) >> 4
       )
     else {

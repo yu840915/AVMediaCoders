@@ -37,10 +37,7 @@ public class HEVCNALUnitMerger {
     var bytes: [UInt8] = []
     for nalu in nalUnits {
       let naluBytes = nalu.bytes
-      var lenBytes = [UInt8](repeating: 0, count: 4)
-      var len = UInt32(naluBytes.count).bigEndian
-      memcpy(&lenBytes, &len, 4)
-      bytes.append(contentsOf: lenBytes)
+      bytes.append(contentsOf: UInt32(naluBytes.count).bigEndianBytes)
       bytes.append(contentsOf: naluBytes)
     }
     var blockBuffer: CMBlockBuffer?

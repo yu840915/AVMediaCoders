@@ -92,12 +92,9 @@ extension CMSampleBuffer {
 
     while offset < bufSize {
       // Read the NALU length (4 bytes)
-      var naluLength: UInt32 = 0
-      var lenBytes = [UInt8](bufBytes[offset..<offset + 4])
-      memcpy(&naluLength, &lenBytes, 4)
-      naluLength = CFSwapInt32BigToHost(naluLength)  // Convert to host byte order
+      let lenBytes = [UInt8](bufBytes[offset..<offset + 4])
+      let naluLength = try UInt32(bigEndianBytes: lenBytes)
       offset += 4
-
       // Read the NALU data
 
       nalus.append(

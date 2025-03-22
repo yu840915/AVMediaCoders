@@ -5,7 +5,7 @@ import Testing
 struct PESOptionalHeaderTests {
   @Test
   func encodeEmptyHeader() async throws {
-    let sut = PESOptionalHeader(
+    let sut = PESHeaderExtension(
       scramblingControl: .notScrambling,
       isOriginal: false,
       ptsAndDts: .none
@@ -16,7 +16,7 @@ struct PESOptionalHeaderTests {
 
   @Test
   func encodePts() async throws {
-    let sut = PESOptionalHeader(
+    let sut = PESHeaderExtension(
       scramblingControl: .notScrambling,
       isOriginal: false,
       ptsAndDts: .pts(
@@ -40,7 +40,7 @@ struct PESOptionalHeaderTests {
 
   @Test
   func encodePtsAndDts() async throws {
-    let sut = PESOptionalHeader(
+    let sut = PESHeaderExtension(
       scramblingControl: .notScrambling,
       isOriginal: false,
       ptsAndDts: .ptsAndDts(
@@ -72,7 +72,7 @@ struct PESOptionalHeaderTests {
 
   @Test
   func encodeAndDecode() async throws {
-    let src = PESOptionalHeader(
+    let src = PESHeaderExtension(
       scramblingControl: .notScrambling,
       ptsAndDts: .ptsAndDts(
         pts: .init(value: 123_456_789, timescale: 90000),
@@ -80,7 +80,7 @@ struct PESOptionalHeaderTests {
       )
     )
 
-    let sut = try PESOptionalHeader(bytes: src.bytes)
+    let sut = try PESHeaderExtension(bytes: src.bytes)
 
     #expect(sut == src)
   }
@@ -93,7 +93,7 @@ struct PESOptionalHeaderTests {
     ]
 
     #expect(throws: AVMediaCodersError.invalidPES(.headerDataTooShort)) {
-      try PESOptionalHeader(bytes: bytes)
+      try PESHeaderExtension(bytes: bytes)
     }
   }
 
@@ -105,7 +105,7 @@ struct PESOptionalHeaderTests {
     ]
 
     #expect(throws: AVMediaCodersError.invalidPES(.conflictingPtsDtsFlag)) {
-      try PESOptionalHeader(bytes: bytes)
+      try PESHeaderExtension(bytes: bytes)
     }
   }
 
@@ -118,7 +118,7 @@ struct PESOptionalHeaderTests {
     ]
 
     #expect(throws: AVMediaCodersError.invalidPES(.conflictingPtsDtsFlag)) {
-      try PESOptionalHeader(bytes: bytes)
+      try PESHeaderExtension(bytes: bytes)
     }
   }
 
@@ -131,7 +131,7 @@ struct PESOptionalHeaderTests {
     ]
 
     #expect(throws: AVMediaCodersError.invalidPES(.conflictingPtsDtsFlag)) {
-      try PESOptionalHeader(bytes: bytes)
+      try PESHeaderExtension(bytes: bytes)
     }
   }
 
@@ -144,7 +144,27 @@ struct PESOptionalHeaderTests {
     ]
 
     #expect(throws: AVMediaCodersError.bufferTooShort) {
-      try PESOptionalHeader(bytes: bytes)
+      try PESHeaderExtension(bytes: bytes)
     }
+  }
+
+  @Test 
+  func retainOnlyRelevantBytes() async throws {
+    let bytes: [UInt8] = [
+      0b1000_0000, 0b1100_0000, 0b0000_1010,
+      0b0011_0001, 0b0001_1101, 0b0110_1111, 0b1001_1010, 0b0010_1011,
+      0b0001_0001, 0b0000_0000, 0b0000_0001, 0b0000_0000, 0b0101_0101,
+      0b0001_0000, 0b1100_0000, 0b0000_1010,
+    ]
+
+    let sut = try PESHeaderExtension(bytes: bytes)
+
+    #expect(
+      sut.bytes == [
+        0b1000_0000, 0b1100_0000, 0b0000_1010,
+        0b0011_0001, 0b0001_1101, 0b0110_1111, 0b1001_1010, 0b0010_1011,
+        0b0001_0001, 0b0000_0000, 0b0000_0001, 0b0000_0000, 0b0101_0101,
+      ]
+    )
   }
 }

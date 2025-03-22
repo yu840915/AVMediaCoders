@@ -5,7 +5,7 @@ import Testing
 struct PESOptionalHeaderFlagsTests {
   @Test
   func encodeAllFalseToBytes() async throws {
-    var sut = PESOptionalHeaderFlags()
+    var sut = PESHeaderExtensionFlags()
     sut.scramblingControl = .notScrambling
     sut.priority = false
     sut.dataAlignmentIndicator = false
@@ -25,7 +25,7 @@ struct PESOptionalHeaderFlagsTests {
 
   @Test
   func encodeAllTrueToBytes() async throws {
-    var sut = PESOptionalHeaderFlags()
+    var sut = PESHeaderExtensionFlags()
     sut.scramblingControl = .oddKeyScrambled
     sut.priority = true
     sut.dataAlignmentIndicator = true
@@ -45,7 +45,7 @@ struct PESOptionalHeaderFlagsTests {
 
   @Test
   func encodeOddTrueToBytes() async throws {
-    var sut = PESOptionalHeaderFlags()
+    var sut = PESHeaderExtensionFlags()
     sut.scramblingControl = .evenKeyScrambled
     sut.priority = true
     sut.dataAlignmentIndicator = false
@@ -65,7 +65,7 @@ struct PESOptionalHeaderFlagsTests {
 
   @Test
   func encodeAndDecode() async throws {
-    var sut = PESOptionalHeaderFlags()
+    var sut = PESHeaderExtensionFlags()
     sut.scramblingControl = .reserved
     sut.priority = false
     sut.dataAlignmentIndicator = true
@@ -81,7 +81,7 @@ struct PESOptionalHeaderFlagsTests {
     sut.headerDataLength = 0b01010_101
 
     let bytes = sut.bytes
-    let decoded = try PESOptionalHeaderFlags(bytes: bytes)
+    let decoded = try PESHeaderExtensionFlags(bytes: bytes)
 
     #expect(sut == decoded)
   }
@@ -89,13 +89,13 @@ struct PESOptionalHeaderFlagsTests {
   @Test
   func detectInvalidMarkerBit() async throws {
     #expect(throws: AVMediaCodersError.invalidPES(.invalidMarkerBit)) {
-      try PESOptionalHeaderFlags(bytes: [0b0000_0000, 0b0000_0000, 0b0000_0000])
+      try PESHeaderExtensionFlags(bytes: [0b0000_0000, 0b0000_0000, 0b0000_0000])
     }
   }
 
   @Test func detectInvalidPtsDtsFlag() async throws {
     #expect(throws: AVMediaCodersError.invalidPES(.invalidPtsDtsFlag)) {
-      try PESOptionalHeaderFlags(bytes: [0b1000_0000, 0b0100_0000, 0b0000_0000])
+      try PESHeaderExtensionFlags(bytes: [0b1000_0000, 0b0100_0000, 0b0000_0000])
     }
   }
 }
