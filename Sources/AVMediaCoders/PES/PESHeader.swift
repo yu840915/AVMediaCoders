@@ -3,6 +3,9 @@ struct PESHeader: Equatable {
   var pesPacketLength: UInt16 {
     UInt16(byteFormat.pesPacketLength)
   }
+  var payloadLength: Int {
+    Int(pesPacketLength) - type.extensionBytes.count
+  }
   let byteFormat: MainPartByteFormat
   let bytes: [UInt8]
 
