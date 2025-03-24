@@ -1,9 +1,11 @@
 import CoreMedia
 
-class VideoDeacketizer {
+public class VideoDeacketizer {
   let sampleBufferComposer: HEVCSampleBufferComposer = HEVCSampleBufferComposer()
+  
+  public init() {}
 
-  func depacketize(_ packet: PESPacket) throws -> [CMSampleBuffer] {
+  public func depacketize(_ packet: PESPacket) throws -> [CMSampleBuffer] {
     let nalu = try HEVCNALUnit(bytes: packet.payload)
     return try sampleBufferComposer.compose(
       from: [nalu],

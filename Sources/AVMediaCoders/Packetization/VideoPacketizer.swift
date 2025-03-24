@@ -1,10 +1,10 @@
 import CoreMedia
 
-class VideoPacketizer {
-
+public class VideoPacketizer {
+  public init() {}
   let decomposer: HEVCSampleBufferDecomposer = HEVCSampleBufferDecomposer()
 
-  func packetize(_ videoBuffer: CMSampleBuffer, streamID: UInt8 = 0) throws -> [PESPacket] {
+  public func packetize(_ videoBuffer: CMSampleBuffer, streamID: UInt8 = 0) throws -> [PESPacket] {
     let nalus = try decomposer.decompose(videoBuffer)
     let ptsDts = PESHeaderExtension.PtsAndDts(
       pts: videoBuffer.presentationTimeStamp, dts: videoBuffer.decodeTimeStamp
