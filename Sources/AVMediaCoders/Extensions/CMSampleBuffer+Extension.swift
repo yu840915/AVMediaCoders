@@ -1,4 +1,4 @@
-import AVFoundation
+import CoreMedia
 
 extension CMSampleBuffer {
   var containsKeyFrame: Bool {

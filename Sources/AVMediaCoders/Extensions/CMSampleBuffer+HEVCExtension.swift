@@ -1,4 +1,4 @@
-import AVFoundation
+import CoreMedia
 
 extension CMSampleBuffer {
   func getHEVCParameterSets() throws -> [HEVCNALUnit]? {

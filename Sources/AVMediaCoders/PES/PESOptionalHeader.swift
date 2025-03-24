@@ -20,7 +20,7 @@ struct PESHeaderExtension: Equatable {
   let bytes: [UInt8]
 
   init(
-    scramblingControl: ScramblingControl,
+    scramblingControl: ScramblingControl = .notScrambling,
     dataAlignmentIndicator: Bool = false,
     copyRight: Bool = false,
     isOriginal: Bool = true,
@@ -67,14 +67,6 @@ extension PESHeaderExtension {
     case pts(CMTime)
     case ptsAndDts(pts: CMTime, dts: CMTime)
 
-    func toFlag() -> PESHeaderExtensionFlags.PtsDtsFlag {
-      switch self {
-      case .none: .none
-      case .pts: .pts
-      case .ptsAndDts: .ptsAndDts
-      }
-    }
-
     var bytes: [UInt8] {
       switch self {
       case .none: return []
@@ -84,6 +76,40 @@ extension PESHeaderExtension {
           + ISOMediaTimestamp(prefix: .dts, videoTime: dts).bytes
       }
     }
+    var pts: CMTime? {
+      return switch self {
+      case .none: nil
+      case .pts(let pts): pts
+      case .ptsAndDts(let pts, _): pts
+      }
+    }
+    var dts: CMTime? {
+      return switch self {
+      case .none, .pts: nil
+      case .ptsAndDts(_, let dts): dts
+      }
+    }
+
+    init(pts: CMTime, dts: CMTime) {
+      guard pts.isValid else {
+        self = .none
+        return
+      }
+      if dts.isValid {
+        self = .ptsAndDts(pts: pts, dts: dts)
+      } else {
+        self = .pts(pts)
+      }
+    }
+
+    func toFlag() -> PESHeaderExtensionFlags.PtsDtsFlag {
+      switch self {
+      case .none: .none
+      case .pts: .pts
+      case .ptsAndDts: .ptsAndDts
+      }
+    }
+
   }
 }
 

@@ -1,14 +1,24 @@
-import AVFoundation
+import CoreMedia
 
-public class HEVCNALUnitMerger {
+public class HEVCSampleBufferComposer {
   private var formatDescription: CMFormatDescription?
   private var formatDescriptionBuilder: HEVCFormatDescriptionBuilder?
+  private(set) var dts: CMTime?
+  private(set) var pts: CMTime?
   var frameID = 0
 
   public init() {}
 
-  public func merge(from nalUnits: [HEVCNALUnit]) throws -> [CMSampleBuffer] {
-    try mergeSampleBuffers(from: nalUnits)
+  public func compose(
+    from nalUnits: [HEVCNALUnit],
+    pts: CMTime?,
+    dts: CMTime?
+  ) throws
+    -> [CMSampleBuffer]
+  {
+    self.pts = pts
+    self.dts = dts
+    return try mergeSampleBuffers(from: nalUnits)
   }
 
   fileprivate func mergeSampleBuffers(from nalUnits: [HEVCNALUnit]) throws -> [CMSampleBuffer] {
@@ -117,9 +127,11 @@ public class HEVCNALUnitMerger {
 
   private func createIncreasingTimingInfo() -> CMSampleTimingInfo {
     var timingInfo = CMSampleTimingInfo()
-    timingInfo.decodeTimeStamp = CMTime.invalid
-    timingInfo.presentationTimeStamp = CMTime(
-      value: CMTimeValue(frameID * 20), timescale: CMTimeScale(600))
+    timingInfo.decodeTimeStamp = dts ?? CMTime.invalid
+    timingInfo.presentationTimeStamp =
+      pts
+      ?? CMTime(
+        value: CMTimeValue(frameID * 20), timescale: CMTimeScale(600))
     timingInfo.duration = CMTime(value: CMTimeValue(20), timescale: CMTimeScale(600))
     frameID = frameID.advanced(by: 1)
     return timingInfo

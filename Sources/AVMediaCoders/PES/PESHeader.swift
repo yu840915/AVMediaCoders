@@ -1,3 +1,5 @@
+import CoreMedia
+
 struct PESHeader: Equatable {
   let type: StreamType
   var pesPacketLength: UInt16 {
@@ -51,6 +53,26 @@ extension PESHeader {
       case .audio(_, let ext): ext.bytes
       case .video(_, let ext): ext.bytes
       default: []
+      }
+    }
+
+    var pts: CMTime? {
+      return switch self {
+      case .privateStream1(let ext),
+        .audio(_, let ext),
+        .video(_, let ext):
+        ext.ptsAndDts.pts
+      default: nil
+      }
+    }
+
+    var dts: CMTime? {
+      return switch self {
+      case .privateStream1(let ext),
+        .audio(_, let ext),
+        .video(_, let ext):
+        ext.ptsAndDts.dts
+      default: nil
       }
     }
 

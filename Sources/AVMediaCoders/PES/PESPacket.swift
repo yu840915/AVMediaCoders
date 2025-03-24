@@ -1,7 +1,11 @@
+import CoreMedia
+
 struct PESPacket: Equatable {
   let header: PESHeader
   let payload: [UInt8]
   var bytes: [UInt8] { header.bytes + payload }
+  var pts: CMTime? { header.type.pts }
+  var dts: CMTime? { header.type.dts }
 
   init(streamType: PESHeader.StreamType, payload: [UInt8] = []) {
     self.header = PESHeader(type: streamType, payloadLength: UInt16(payload.count))
