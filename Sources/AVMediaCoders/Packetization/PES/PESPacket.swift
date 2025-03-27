@@ -1,6 +1,6 @@
 import CoreMedia
 
-public struct PESPacket: Equatable {
+public struct PESPacket: Equatable, Sendable {
   let header: PESHeader
   let payload: [UInt8]
   var bytes: [UInt8] { header.bytes + payload }

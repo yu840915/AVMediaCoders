@@ -8,6 +8,7 @@ enum AVMediaCodersError: Error, Equatable {
   case missingBuffer
   case invalidHEVC(HEVCNALUnitError)
   case invalidPES(PESError)
+  case invalidTS(TSError)
   case invalidISOTimestampPrefix
   case bufferTooShort
 }
@@ -33,4 +34,8 @@ enum PESError: Error, Equatable {
   case headerDataTooShort
   case conflictingPtsDtsFlag
   case invalidStreamID
+}
+
+enum TSError: Error, Equatable {
+  case invalidSyncByte
 }
