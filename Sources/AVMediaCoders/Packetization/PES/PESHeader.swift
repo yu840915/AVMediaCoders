@@ -1,5 +1,7 @@
 import CoreMedia
 
+//REF: https://dvd.sourceforge.net/dvdinfo/pes-hdr.html
+
 struct PESHeader: Equatable {
   let type: StreamType
   var pesPacketLength: UInt16 {
