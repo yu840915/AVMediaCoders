@@ -1,4 +1,6 @@
 struct TSAdaptationField: Equatable {
+  static let minimumLength: UInt8 = 2
+  static let maximumLength: UInt8 = 184
   let length: UInt8
   let pcr: TSClockReference?
   let opcr: TSClockReference?
@@ -35,6 +37,25 @@ struct TSAdaptationField: Equatable {
     self.bytes = [length] + bytes
   }
 
+  init(totalLength: UInt8) {
+    self.length = max(totalLength, 2) - 1
+    self.pcr = nil
+    self.opcr = nil
+    self.spliceCountdown = nil
+    self.transportPrivateData = nil
+    flags = Flags(
+      discontinuityIndicator: false,
+      randomAccessIndicator: false,
+      elementaryStreamPriorityIndicator: false,
+      pcrFlag: false,
+      opcrFlag: false,
+      splicingPointFlag: false,
+      transportPrivateDataFlag: false,
+      adaptationFieldExtensionFlag: false
+    )
+    self.bytes = [length] + flags.bytes + Array(repeating: 0xFF, count: Int(length - 1))
+  }
+
   init(bytes: [UInt8]) throws {
     guard bytes.count >= 2 else {
       throw AVMediaCodersError.bufferTooShort
@@ -64,12 +85,12 @@ struct TSAdaptationField: Equatable {
       spliceCountdown = nil
     }
     if flags.transportPrivateDataFlag {
-      let length = remainingBytes[0]    
+      let length = remainingBytes[0]
       transportPrivateData = Array(remainingBytes[1...Int(length)])
       remainingBytes = Array(remainingBytes[Int(length + 1)...])
     } else {
       transportPrivateData = nil
-    }    
+    }
     self.bytes = Array(bytes[0...Int(length)])
   }
 }

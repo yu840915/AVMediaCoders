@@ -134,4 +134,50 @@ struct TSAdaptationFieldTests {
 
     #expect(sut.transportPrivateData == [0x3A, 0x80])
   }
+
+  @Test func encodeStuffingBytes() async throws {
+    let sut = TSAdaptationField(totalLength: 10)
+
+    let bytes = sut.bytes
+
+    #expect(
+      bytes == [
+        0x09, 0x00,
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+      ]
+    )
+  }
+
+  @Test
+  func minStuffingBytes() async throws {
+    let sut = TSAdaptationField(totalLength: TSAdaptationField.minimumLength)
+
+    let bytes = sut.bytes
+
+    #expect(bytes == [0x01, 0x00])
+  }
+
+  @Test
+  func maxStuffingBytes() async throws {
+    let sut = TSAdaptationField(totalLength: TSAdaptationField.maximumLength)
+
+    let bytes = sut.bytes
+
+    #expect(bytes == [0xB7, 0x00] + Array(repeating: 0xFF, count: 182))
+  }
+
+  @Test(
+    arguments: [
+      TSAdaptationField(totalLength: 10),
+      TSAdaptationField(totalLength: TSAdaptationField.minimumLength),
+      TSAdaptationField(totalLength: TSAdaptationField.maximumLength),
+    ]
+  )
+  func encodeDecodeStuffingBytes(_ src: TSAdaptationField) async throws {
+    let bytes = src.bytes
+
+    let sut = try TSAdaptationField(bytes: bytes)
+
+    #expect(sut == src)
+  }
 }
