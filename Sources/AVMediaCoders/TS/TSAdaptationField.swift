@@ -14,6 +14,7 @@ struct TSAdaptationField: Equatable {
   let bytes: [UInt8]
 
   init(
+    remainingDataLength: Int,
     pcr: TSClockReference? = nil,
     opcr: TSClockReference? = nil,
     randomAccessIndicator: Bool = false
@@ -33,27 +34,15 @@ struct TSAdaptationField: Equatable {
     self.spliceCountdown = nil
     self.transportPrivateData = nil
     let bytes: [UInt8] = flags.bytes + (pcr?.bytes ?? []) + (opcr?.bytes ?? [])
-    self.length = UInt8(bytes.count)
-    self.bytes = [length] + bytes
-  }
-
-  init(totalLength: UInt8) {
-    self.length = max(totalLength, 2) - 1
-    self.pcr = nil
-    self.opcr = nil
-    self.spliceCountdown = nil
-    self.transportPrivateData = nil
-    flags = Flags(
-      discontinuityIndicator: false,
-      randomAccessIndicator: false,
-      elementaryStreamPriorityIndicator: false,
-      pcrFlag: false,
-      opcrFlag: false,
-      splicingPointFlag: false,
-      transportPrivateDataFlag: false,
-      adaptationFieldExtensionFlag: false
+    let fieldLength = UInt8(bytes.count)
+    let stuffingLength = UInt8(
+      max(
+        Int(TSAdaptationField.maximumLength - 1 - fieldLength) - remainingDataLength,
+        0
+      )
     )
-    self.bytes = [length] + flags.bytes + Array(repeating: 0xFF, count: Int(length - 1))
+    self.length = fieldLength + stuffingLength
+    self.bytes = [length] + bytes + Array(repeating: 0xFF, count: Int(stuffingLength))
   }
 
   init(bytes: [UInt8]) throws {

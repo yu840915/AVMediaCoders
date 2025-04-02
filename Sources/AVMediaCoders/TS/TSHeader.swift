@@ -117,27 +117,3 @@ extension TSHeader {
     case adaptationFieldAndPayload = 0b11
   }
 }
-
-struct AdaptationField {
-  let length: UInt8
-  let discontinuityIndicator: Bool
-  let randomAccessIndicator: Bool
-  let elementaryStreamPriorityIndicator: Bool
-  let pcrFlag: Bool
-  let opcrFlag: Bool
-  let splicingPointFlag: Bool
-  let transportPrivateDataFlag: Bool
-  let adaptationFieldExtensionFlag: Bool
-}
-
-struct AdaptationFieldExtension {
-  let length: UInt8
-  let ltwFlag: Bool
-  let piecewiseRateFlag: Bool
-  let seamlessSpliceFlag: Bool
-  let ltwValidFlag: Bool
-  let ltwOffset: UInt16
-  let piecewiseRate: UInt32
-  let spliceType: UInt8
-  let dtsNextAccessUnit: UInt64
-}

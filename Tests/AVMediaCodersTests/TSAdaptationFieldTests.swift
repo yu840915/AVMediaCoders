@@ -5,7 +5,7 @@ import Testing
 struct TSAdaptationFieldTests {
   @Test
   func encodeSimpleAdaptationFields() async throws {
-    let sut = TSAdaptationField()
+    let sut = TSAdaptationField(remainingDataLength: 300)
 
     let bytes = sut.bytes
 
@@ -15,6 +15,7 @@ struct TSAdaptationFieldTests {
   @Test
   func encodeFieldsWithPCRandOPCE() async throws {
     let sut = TSAdaptationField(
+      remainingDataLength: 300,
       pcr: TSClockReference(0x1FFFF_FFFF),
       opcr: TSClockReference(0, ext: 0x1FF),
       randomAccessIndicator: true
@@ -33,13 +34,15 @@ struct TSAdaptationFieldTests {
 
   @Test(
     arguments: [
-      TSAdaptationField(),
+      TSAdaptationField(remainingDataLength: 300),
       TSAdaptationField(
+        remainingDataLength: 300,
         pcr: TSClockReference(0x1FFFF_FFFF),
         opcr: TSClockReference(0, ext: 0x1FF),
         randomAccessIndicator: true
       ),
       TSAdaptationField(
+        remainingDataLength: 300,
         pcr: TSClockReference(0x1FFFF_FFFF),
         opcr: nil,
         randomAccessIndicator: false
@@ -135,22 +138,9 @@ struct TSAdaptationFieldTests {
     #expect(sut.transportPrivateData == [0x3A, 0x80])
   }
 
-  @Test func encodeStuffingBytes() async throws {
-    let sut = TSAdaptationField(totalLength: 10)
-
-    let bytes = sut.bytes
-
-    #expect(
-      bytes == [
-        0x09, 0x00,
-        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-      ]
-    )
-  }
-
   @Test
-  func minStuffingBytes() async throws {
-    let sut = TSAdaptationField(totalLength: TSAdaptationField.minimumLength)
+  func inferMinStuffingBytes() async throws {
+    let sut = TSAdaptationField(remainingDataLength: Int(TSAdaptationField.maximumLength))
 
     let bytes = sut.bytes
 
@@ -158,8 +148,8 @@ struct TSAdaptationFieldTests {
   }
 
   @Test
-  func maxStuffingBytes() async throws {
-    let sut = TSAdaptationField(totalLength: TSAdaptationField.maximumLength)
+  func inferMaxStuffingBytes() async throws {
+    let sut = TSAdaptationField(remainingDataLength: 0)
 
     let bytes = sut.bytes
 
@@ -168,9 +158,10 @@ struct TSAdaptationFieldTests {
 
   @Test(
     arguments: [
-      TSAdaptationField(totalLength: 10),
-      TSAdaptationField(totalLength: TSAdaptationField.minimumLength),
-      TSAdaptationField(totalLength: TSAdaptationField.maximumLength),
+      TSAdaptationField(remainingDataLength: 10),
+      TSAdaptationField(remainingDataLength: 0),
+      TSAdaptationField(remainingDataLength: Int(TSAdaptationField.minimumLength)),
+      TSAdaptationField(remainingDataLength: Int(TSAdaptationField.maximumLength)),
     ]
   )
   func encodeDecodeStuffingBytes(_ src: TSAdaptationField) async throws {
@@ -179,5 +170,26 @@ struct TSAdaptationFieldTests {
     let sut = try TSAdaptationField(bytes: bytes)
 
     #expect(sut == src)
+  }
+
+  @Test
+  func encodeAdaptationFieldDataWithStuffing() async throws {
+    let sut = TSAdaptationField(
+      remainingDataLength: 0,
+      pcr: TSClockReference(0x1FFFF_FFFF),
+      opcr: TSClockReference(0, ext: 0x1FF),
+      randomAccessIndicator: true
+    )
+
+    let bytes = sut.bytes
+
+    #expect(
+      bytes == [
+        0xB7, 0x58,
+        0xFF, 0xFF, 0xFF, 0xFF, 0x80, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x01, 0xFF,
+      ] + Array(repeating: 0xFF, count: 170)
+    )
+
   }
 }
