@@ -31,4 +31,36 @@ struct TSPacketTests {
     #expect(field.length == 183)  //184 - {len byte}
     #expect(sut.bytes.count == 188)
   }
+
+  @Test(arguments: [
+    TSPacket(pid: 0xFF, continuityCounter: 0x2),
+    TSPacket(pid: 0xFF, continuityCounter: 0x2, data: [0x42]),
+  ])
+  func encodeDecode(_ src: TSPacket) async throws {
+    let bytes = src.bytes
+
+    let sut = try TSPacket(bytes: bytes)
+
+    #expect(sut == src)
+  }
+
+  @Test
+  func detectInsufficientBuffer() async throws {
+    let bytes = TSPacket(pid: 0xFF, continuityCounter: 0x2, data: [0x42]).bytes
+
+    #expect(throws: AVMediaCodersError.bufferTooShort) {
+      try TSPacket(bytes: Array(bytes[0..<bytes.count - 1]))
+    }
+  }
+
+  @Test
+  func retainOnlyRelevantBytes() async throws {
+    let src = TSPacket(pid: 0xFF, continuityCounter: 0x2, data: [0x42])
+    let bytes = src.bytes + [0x47]
+
+    let sut = try TSPacket(bytes: bytes)
+
+    #expect(sut == src)
+  }
+
 }

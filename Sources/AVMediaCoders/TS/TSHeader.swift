@@ -3,6 +3,9 @@ struct TSHeader: Equatable {
   var isStartOfPayload: Bool {
     byteRepresentation.transportErrorIndicator
   }
+  var adaptationFieldControl: AdaptationFieldControl {
+    byteRepresentation.adaptationFieldControl
+  }
   var pid: UInt16 {
     byteRepresentation.pid
   }

@@ -33,8 +33,20 @@ struct TSPacket: Equatable {
         header = TSHeader(
             isStartOfPayload: isStartOfPayload,
             pid: pid,
-            adaptationFieldControl: .reserved,
+            adaptationFieldControl: payload.adaptationFieldControl,
             continuityCounter: continuityCounter
+        )
+    }
+
+    init(bytes: [UInt8]) throws {
+        guard bytes.count >= packetSize else {
+            throw AVMediaCodersError.bufferTooShort
+        }
+        header = try TSHeader(bytes: Array(bytes[0..<headerSize]))
+
+        payload = try Payload(
+            adaptationFieldControl: header.adaptationFieldControl,
+            data: Array(bytes[headerSize..<packetSize])
         )
     }
 }
@@ -53,6 +65,31 @@ extension TSPacket {
                 return data
             case .both(let field, let data):
                 return field.bytes + data
+            }
+        }
+
+        var adaptationFieldControl: TSHeader.AdaptationFieldControl {
+            switch self {
+            case .adaptationField: .adaptationFieldOnly
+            case .dataPayload: .payloadOnly
+            case .both: .adaptationFieldAndPayload
+            }
+        }
+
+        fileprivate init(
+            adaptationFieldControl control: TSHeader.AdaptationFieldControl,
+            data: [UInt8]
+        ) throws {
+            switch control {
+            case .adaptationFieldOnly:
+                self = .adaptationField(try TSAdaptationField(bytes: data))
+            case .payloadOnly:
+                self = .dataPayload(data)
+            case .adaptationFieldAndPayload:
+                let field = try TSAdaptationField(bytes: data)
+                self = .both(field, Array(data[Int(field.length + 1)...]))
+            case .reserved:
+                self = .dataPayload(data)
             }
         }
     }

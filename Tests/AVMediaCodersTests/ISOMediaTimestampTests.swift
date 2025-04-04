@@ -25,7 +25,6 @@ struct ISOMediaTimestampTests {
     let bytes = sut.bytes
 
     #expect(bytes.count == 5)
-    print(bytes)
     #expect(bytes == [0b00100001, 0b00011101, 0b01101111, 0b10011010, 0b00101011])
   }
 

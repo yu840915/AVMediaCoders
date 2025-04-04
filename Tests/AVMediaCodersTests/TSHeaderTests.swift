@@ -47,7 +47,7 @@ struct TSHeaderTests {
   }
 
   @Test
-  func rejectShoreBuffer() async throws {
+  func rejectShortBuffer() async throws {
     let bytes: [UInt8] = [0b0100_0111, 0b0100_0000, 0b0000_0000]
 
     #expect(
