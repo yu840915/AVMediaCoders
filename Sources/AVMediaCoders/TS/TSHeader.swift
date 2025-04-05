@@ -1,7 +1,7 @@
 struct TSHeader: Equatable {
   let byteRepresentation: ByteRepresentation
   var isStartOfPayload: Bool {
-    byteRepresentation.transportErrorIndicator
+    byteRepresentation.payloadUnitStartIndicator
   }
   var adaptationFieldControl: AdaptationFieldControl {
     byteRepresentation.adaptationFieldControl

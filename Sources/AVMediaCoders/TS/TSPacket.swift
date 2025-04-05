@@ -25,10 +25,10 @@ struct TSPacket: Equatable {
             )
             payload =
                 hasData
-                ? .both(af, data)
+                ? .both(af, Array(data.prefix(payloadSize - Int(af.length) - 1)))
                 : .adaptationField(af)
         } else {
-            payload = .dataPayload(data)
+            payload = .dataPayload(Array(data.prefix(payloadSize)))
         }
         header = TSHeader(
             isStartOfPayload: isStartOfPayload,
@@ -57,14 +57,19 @@ extension TSPacket {
         case dataPayload([UInt8])
         case both(TSAdaptationField, [UInt8])
 
+        var dataPayloadLength: Int {
+            switch self {
+            case .adaptationField: 0
+            case .dataPayload(let data): data.count
+            case .both(_, let data): data.count
+            }
+        }
+
         var bytes: [UInt8] {
             switch self {
-            case .adaptationField(let field):
-                return field.bytes
-            case .dataPayload(let data):
-                return data
-            case .both(let field, let data):
-                return field.bytes + data
+            case .adaptationField(let field): field.bytes
+            case .dataPayload(let data): data
+            case .both(let field, let data): field.bytes + data
             }
         }
 

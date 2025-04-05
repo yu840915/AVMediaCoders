@@ -20,6 +20,43 @@ struct TSPacketTests {
   }
 
   @Test
+  func discardExcessiveDataWithoutHeader() async throws {
+    let sut = TSPacket(
+      pid: 0xFF, continuityCounter: 0x2, data: Array(repeating: 0x42, count: 200)
+    )
+
+    #expect(sut.header.pid == 0xFF)
+    #expect(sut.header.continuityCounter == 0x2)
+    guard case let .dataPayload(payload) = sut.payload else {
+      throw TestError.unexpectedValue
+    }
+    #expect(payload == Array(repeating: 0x42, count: 184))
+    #expect(sut.bytes.count == 188)
+  }
+
+  @Test
+  func discardExcessiveDataWithHeader() async throws {
+    let sut = TSPacket(
+      pid: 0xFF,
+      continuityCounter: 0x2,
+      adaptationFieldConfiguration: TSPacket.AdaptationFieldConfiguration(
+        pcr: TSClockReference(0x1_FFFF_FFFF),
+        opcr: nil,
+        allowRandomAccess: false
+      ),
+      data: Array(repeating: 0x42, count: 200)
+    )
+
+    #expect(sut.header.pid == 0xFF)
+    #expect(sut.header.continuityCounter == 0x2)
+    guard case let .both(_, payload) = sut.payload else {
+      throw TestError.unexpectedValue
+    }
+    #expect(payload == Array(repeating: 0x42, count: 176))
+    #expect(sut.bytes.count == 188)
+  }
+
+  @Test
   func allPadding() async throws {
     let sut = TSPacket(pid: 0xFF, continuityCounter: 0x2)
 
