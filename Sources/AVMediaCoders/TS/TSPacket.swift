@@ -81,6 +81,22 @@ extension TSPacket {
             }
         }
 
+        var adaptationField: TSAdaptationField? {
+            switch self {
+            case .adaptationField(let field): return field
+            case .dataPayload: return nil
+            case .both(let field, _): return field
+            }
+        }
+
+        var dataPayload: [UInt8] {
+            switch self {
+            case .adaptationField: return []
+            case .dataPayload(let data): return data
+            case .both(_, let data): return data
+            }
+        }
+
         fileprivate init(
             adaptationFieldControl control: TSHeader.AdaptationFieldControl,
             data: [UInt8]
@@ -99,7 +115,7 @@ extension TSPacket {
         }
     }
 
-    struct AdaptationFieldConfiguration {
+    struct AdaptationFieldConfiguration: Equatable {
         let pcr: TSClockReference?
         let opcr: TSClockReference?
         let allowRandomAccess: Bool
