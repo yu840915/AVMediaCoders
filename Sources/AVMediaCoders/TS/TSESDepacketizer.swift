@@ -1,3 +1,5 @@
+private let logger = Loggers.tsDepacketizing.build()
+
 actor TSESDepacketizer {
   let pid: TSPID
   private(set) var stashedPackets: [TSPacket] = []
@@ -31,12 +33,26 @@ actor TSESDepacketizer {
     defer {
       stashedPackets.removeAll()
     }
-    return Output(
-      esData: stashedPackets.reduce(into: [UInt8]()) { result, packet in
+    do {
+      var counter = stashedPackets[0].header.continuityCounter
+      let esData = try stashedPackets.reduce(into: [UInt8]()) { result, packet in
+        guard packet.header.continuityCounter == counter else {
+          throw AVMediaCodersError.invalidTS(.discountinuityDetected)
+        }
+        counter = (counter + 1) & 0x0F
         result.append(contentsOf: packet.payload.dataPayload)
-      },
-      adaptationField: stashedPackets[0].payload.adaptationField
-    )
+      }
+      if esData.isEmpty {
+        return nil
+      }
+      return Output(
+        esData: esData,
+        adaptationField: stashedPackets[0].payload.adaptationField
+      )
+    } catch {
+      logger.warning("Error detected: \(error)")
+      return nil
+    }
   }
 
 }

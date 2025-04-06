@@ -39,4 +39,5 @@ enum PESError: Error, Equatable {
 enum TSError: Error, Equatable {
   case invalidSyncByte
   case unexpectedPID
+  case discountinuityDetected
 }
