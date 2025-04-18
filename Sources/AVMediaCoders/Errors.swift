@@ -41,4 +41,6 @@ enum TSError: Error, Equatable {
   case unexpectedPID
   case invalidHeader
   case discountinuityDetected
+  case invalidCRC
+  case invalidSectionNumber
 }
