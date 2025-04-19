@@ -22,7 +22,7 @@ struct TSProgramAssociationSection: Equatable {
     sectionNumber: UInt8,
     lastSectionNumber: UInt8,
     programMapPIDs: [TSPIDEntry]
-  ) {
+  ) throws {
     self.byteRepresentation = ByteRepresentation(
       transportStreamId: transportStreamId,
       versionNumber: versionNumber,
@@ -31,7 +31,7 @@ struct TSProgramAssociationSection: Equatable {
       lastSectionNumber: lastSectionNumber,
       programMapPIDs: programMapPIDs.map { ByteRepresentation.PIDEntry($0) }
     )
-    self.tableHeader = TSTableHeader(
+    self.tableHeader = try TSTableHeader(
       tableID: .programAssociationSection,
       sectionLength: byteRepresentation.byteLength
     )
@@ -58,7 +58,15 @@ struct TSProgramAssociationSection: Equatable {
 }
 
 extension TSProgramAssociationSection {
+  static var maxPayloadLength: Int {
+    Int(TSTableHeader.TableID.programAssociationSection.maximumSectionLength)
+      - ByteRepresentation.nonPayloadByteLength
+  }
+}
+
+extension TSProgramAssociationSection {
   struct ByteRepresentation: Equatable {
+    static let nonPayloadByteLength = 9
     let transportStreamId: UInt16
     let versionNumber: UInt8
     let currentNextIndicator: Bool
@@ -68,7 +76,7 @@ extension TSProgramAssociationSection {
     let crc: UInt32
 
     var byteLength: UInt16 {
-      9 + UInt16(programMapPIDs.count * 4)
+      UInt16(Self.nonPayloadByteLength) + UInt16(programMapPIDs.count * 4)
     }
 
     private let contentBytes: [UInt8]

@@ -11,13 +11,16 @@ struct TSTableHeader: Equatable {
     byteRepresentation.bytes
   }
 
-  init(tableID: TableID, sectionLength: UInt16) {
+  init(tableID: TableID, sectionLength: UInt16) throws {
+    guard sectionLength <= tableID.maximumSectionLength else {
+      throw AVMediaCodersError.invalidTS(.sectionLengthOutOfBounds)
+    }
     self.tableID = tableID
     byteRepresentation = ByteRepresentation(
       tableID: tableID.value,
       sectionSyntaxIndicator: true,
       privateIndicator: tableID.isPrivateSection,
-      sectionLength: min(sectionLength, tableID.maximumSectionLength)
+      sectionLength: sectionLength
     )
   }
 

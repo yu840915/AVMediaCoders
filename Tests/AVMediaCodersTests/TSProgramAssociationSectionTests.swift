@@ -29,7 +29,7 @@ struct TSProgramAssociationSectionTests {
   )
     async throws
   {
-    let sut = TSProgramAssociationSection(
+    let sut = try TSProgramAssociationSection(
       versionNumber: 0,
       sectionNumber: 0,
       lastSectionNumber: 0,
@@ -43,7 +43,7 @@ struct TSProgramAssociationSectionTests {
 
   @Test
   func correctHeader() async throws {
-    let sut = TSProgramAssociationSection(
+    let sut = try TSProgramAssociationSection(
       versionNumber: 0,
       sectionNumber: 0,
       lastSectionNumber: 1,
@@ -54,7 +54,7 @@ struct TSProgramAssociationSectionTests {
     )
 
     #expect(
-      sut.tableHeader
+      try! sut.tableHeader
         == TSTableHeader(
           tableID: .programAssociationSection,
           sectionLength: 17
@@ -64,7 +64,7 @@ struct TSProgramAssociationSectionTests {
 
   @Test
   func encodeEmpty() async throws {
-    let sut = TSProgramAssociationSection(
+    let sut = try TSProgramAssociationSection(
       transportStreamId: 0,
       versionNumber: 0,
       sectionNumber: 0,
@@ -87,7 +87,7 @@ struct TSProgramAssociationSectionTests {
 
   @Test
   func encodePrograms() async throws {
-    let sut = TSProgramAssociationSection(
+    let sut = try TSProgramAssociationSection(
       transportStreamId: 0,
       versionNumber: 0,
       sectionNumber: 0,
@@ -116,14 +116,14 @@ struct TSProgramAssociationSectionTests {
 
   @Test(
     arguments: [
-      TSProgramAssociationSection(
+      try! TSProgramAssociationSection(
         transportStreamId: 0,
         versionNumber: 0,
         sectionNumber: 0,
         lastSectionNumber: 0,
         programMapPIDs: []
       ),
-      TSProgramAssociationSection(
+      try! TSProgramAssociationSection(
         transportStreamId: 0,
         versionNumber: 0,
         sectionNumber: 0,
@@ -133,7 +133,7 @@ struct TSProgramAssociationSectionTests {
           .init(programNumber: 2, PID: .dataStream(streamID: 1)),
         ]
       ),
-      TSProgramAssociationSection(
+      try! TSProgramAssociationSection(
         transportStreamId: 5,
         versionNumber: 3,
         sectionNumber: 2,

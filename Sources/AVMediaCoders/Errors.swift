@@ -40,7 +40,9 @@ enum TSError: Error, Equatable {
   case invalidSyncByte
   case unexpectedPID
   case invalidHeader
+  case sectionLengthOutOfBounds
   case discountinuityDetected
   case invalidCRC
   case invalidSectionNumber
+  case inconsistentVersion
 }

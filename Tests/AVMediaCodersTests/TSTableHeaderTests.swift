@@ -10,7 +10,7 @@ struct TSTableHeaderTests {
     .TSDescriptionSection,
   ])
   func nonPrivateSection(_ tableID: TSTableHeader.TableID) async throws {
-    let sut = TSTableHeader(
+    let sut = try TSTableHeader(
       tableID: tableID,
       sectionLength: 42
     )
@@ -27,7 +27,7 @@ struct TSTableHeaderTests {
     .userPrivate(id: 0xBE),
   ])
   func privateSection(_ tableID: TSTableHeader.TableID) async throws {
-    let sut = TSTableHeader(
+    let sut = try TSTableHeader(
       tableID: tableID,
       sectionLength: 42
     )
@@ -47,18 +47,18 @@ struct TSTableHeaderTests {
     .userPrivate(id: 0x01),
     .userPrivate(id: 0xBE),
   ])
-  func truncateLength(_ tableID: TSTableHeader.TableID) async throws {
-    let sut = TSTableHeader(
-      tableID: tableID,
-      sectionLength: 0xFFFF
-    )
-
-    #expect(sut.sectionLength == tableID.maximumSectionLength)
+  func checkLength(_ tableID: TSTableHeader.TableID) async throws {
+    #expect(throws: AVMediaCodersError.invalidTS(.sectionLengthOutOfBounds)) {
+      try TSTableHeader(
+        tableID: tableID,
+        sectionLength: 0xFFFF
+      )
+    }
   }
 
   @Test
   func encode() async throws {
-    let sut = TSTableHeader(
+    let sut = try TSTableHeader(
       tableID: .programAssociationSection,
       sectionLength: 42
     )
@@ -68,7 +68,7 @@ struct TSTableHeaderTests {
 
   @Test
   func encodePrivateSection() async throws {
-    let sut = TSTableHeader(
+    let sut = try TSTableHeader(
       tableID: .userPrivate(id: 0x01),
       sectionLength: 0x0FFD
     )
@@ -78,16 +78,16 @@ struct TSTableHeaderTests {
 
   @Test(
     arguments: [
-      TSTableHeader(tableID: .conditionalAccessSection, sectionLength: 0),
-      TSTableHeader(tableID: .programAssociationSection, sectionLength: 42),
-      TSTableHeader(tableID: .TSProgramMapSection, sectionLength: 0x03FD),
-      TSTableHeader(tableID: .TSDescriptionSection, sectionLength: 0x03FD),
-      TSTableHeader(tableID: .ISO14496SceneDescriptionSection, sectionLength: 0x03FD),
-      TSTableHeader(tableID: .ISO14496ObjectDescriptionSection, sectionLength: 0x03FD),
-      TSTableHeader(tableID: .metadataSection, sectionLength: 0x42),
-      TSTableHeader(tableID: .IPMPControlInformationSection, sectionLength: 42),
-      TSTableHeader(tableID: .userPrivate(id: 0x01), sectionLength: 0x03FD),
-      TSTableHeader(tableID: .userPrivate(id: 0xBE), sectionLength: 0x0FFD),
+      try! TSTableHeader(tableID: .conditionalAccessSection, sectionLength: 0),
+      try! TSTableHeader(tableID: .programAssociationSection, sectionLength: 42),
+      try! TSTableHeader(tableID: .TSProgramMapSection, sectionLength: 0x03FD),
+      try! TSTableHeader(tableID: .TSDescriptionSection, sectionLength: 0x03FD),
+      try! TSTableHeader(tableID: .ISO14496SceneDescriptionSection, sectionLength: 0x03FD),
+      try! TSTableHeader(tableID: .ISO14496ObjectDescriptionSection, sectionLength: 0x03FD),
+      try! TSTableHeader(tableID: .metadataSection, sectionLength: 0x42),
+      try! TSTableHeader(tableID: .IPMPControlInformationSection, sectionLength: 42),
+      try! TSTableHeader(tableID: .userPrivate(id: 0x01), sectionLength: 0x03FD),
+      try! TSTableHeader(tableID: .userPrivate(id: 0xBE), sectionLength: 0x0FFD),
     ]
   )
   func encodeDecode(_ src: TSTableHeader) async throws {
