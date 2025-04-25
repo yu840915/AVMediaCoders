@@ -32,11 +32,11 @@ struct TSProgramAssociationSection: Equatable {
       lastSectionNumber: lastSectionNumber,
       programMapPIDs: programMapPIDs.map { ByteRepresentation.PIDEntry($0) }
     )
+    self.programMapPIDs = programMapPIDs
     self.tableHeader = try TSTableHeader(
       tableID: .programAssociationSection,
-      sectionLength: byteRepresentation.byteLength
+      sectionLength: UInt16(byteRepresentation.bytes.count) + 4  // CRC32
     )
-    self.programMapPIDs = programMapPIDs
     crc = CRC32.calculate(tableHeader.bytes + byteRepresentation.bytes)
   }
 
@@ -84,8 +84,7 @@ extension TSProgramAssociationSection {
       UInt16(Self.nonPayloadByteLength) + UInt16(programMapPIDs.count * 4)
     }
 
-    private let contentBytes: [UInt8]
-    var bytes: [UInt8] { contentBytes }
+    let bytes: [UInt8]
 
     struct PIDEntry: Equatable {
       let programNumber: UInt16
@@ -122,7 +121,7 @@ extension TSProgramAssociationSection {
       self.lastSectionNumber = lastSectionNumber
       self.programMapPIDs = programMapPIDs
       let part2: UInt8 = versionNumber << 1 & 0x3E | (currentNextIndicator ? 0x01 : 0)
-      let contentBytes =
+      bytes =
         transportStreamId.bigEndianBytes
         + [part2, sectionNumber, lastSectionNumber]
         + programMapPIDs.reduce([]) { partialResult, entry in
@@ -130,7 +129,6 @@ extension TSProgramAssociationSection {
             + entry.programNumber.bigEndianBytes
             + entry.programMapPID.bigEndianBytes
         }
-      self.contentBytes = contentBytes
     }
 
     init(bytes: [UInt8]) throws {
@@ -146,11 +144,12 @@ extension TSProgramAssociationSection {
         try UInt16(bigEndianBytes: Array(bytes.prefix(2)))
       versionNumber = bytes[2] >> 1 & 0x1F
       currentNextIndicator = bytes[2] & 0x01 == 0x01
-      contentBytes = bytes.dropLast(4)
+      let contentBytes = bytes.dropLast(4)
       let pidBytes = Array(contentBytes.dropFirst(5))
       programMapPIDs = try stride(from: 0, through: pidBytes.count - 4, by: 4).map {
         try PIDEntry(bytes: Array(pidBytes[$0..<$0 + 4]))
       }
+      self.bytes = Array(contentBytes)
     }
   }
 
