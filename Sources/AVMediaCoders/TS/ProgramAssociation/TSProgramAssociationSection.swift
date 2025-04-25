@@ -2,7 +2,7 @@ struct TSProgramAssociationSection: Equatable {
   let tableHeader: TSTableHeader
   let byteRepresentation: ByteRepresentation
   var bytes: [UInt8] {
-    tableHeader.bytes + byteRepresentation.bytes
+    tableHeader.bytes + byteRepresentation.bytes + crc.bigEndianBytes
   }
   var versionNumber: UInt8 {
     byteRepresentation.versionNumber
@@ -15,6 +15,7 @@ struct TSProgramAssociationSection: Equatable {
   }
 
   let programMapPIDs: [TSPIDEntry]
+  let crc: UInt32
 
   init(
     transportStreamId: UInt16 = 0,
@@ -36,6 +37,7 @@ struct TSProgramAssociationSection: Equatable {
       sectionLength: byteRepresentation.byteLength
     )
     self.programMapPIDs = programMapPIDs
+    crc = CRC32.calculate(tableHeader.bytes + byteRepresentation.bytes)
   }
 
   init(bytes: [UInt8]) throws {
@@ -43,13 +45,17 @@ struct TSProgramAssociationSection: Equatable {
     guard tableHeader.tableID == .programAssociationSection else {
       throw AVMediaCodersError.invalidTS(.invalidHeader)
     }
-    let sectionBytes = bytes.dropFirst(3)
     let sectionLength = Int(tableHeader.sectionLength)
-    guard sectionBytes.count >= sectionLength else {
+    guard bytes.dropFirst(3).count >= sectionLength else {
       throw AVMediaCodersError.bufferTooShort
     }
+    let contentBytes = Array(bytes.prefix(Int(tableHeader.sectionLength) + 3))
+    crc = try UInt32(bigEndianBytes: contentBytes.suffix(4))
+    if crc != CRC32.calculate(contentBytes.dropLast(4)) {
+      throw AVMediaCodersError.invalidTS(.invalidCRC)
+    }
     byteRepresentation = try ByteRepresentation(
-      bytes: Array(sectionBytes.prefix(sectionLength))
+      bytes: Array(contentBytes.dropFirst(3))
     )
     programMapPIDs = try byteRepresentation.programMapPIDs.map {
       try TSPIDEntry($0)
@@ -73,14 +79,13 @@ extension TSProgramAssociationSection {
     let sectionNumber: UInt8
     let lastSectionNumber: UInt8
     let programMapPIDs: [PIDEntry]
-    let crc: UInt32
 
     var byteLength: UInt16 {
       UInt16(Self.nonPayloadByteLength) + UInt16(programMapPIDs.count * 4)
     }
 
     private let contentBytes: [UInt8]
-    var bytes: [UInt8] { contentBytes + crc.bigEndianBytes }
+    var bytes: [UInt8] { contentBytes }
 
     struct PIDEntry: Equatable {
       let programNumber: UInt16
@@ -126,7 +131,6 @@ extension TSProgramAssociationSection {
             + entry.programMapPID.bigEndianBytes
         }
       self.contentBytes = contentBytes
-      crc = CRC32.calculate(contentBytes)
     }
 
     init(bytes: [UInt8]) throws {
@@ -146,10 +150,6 @@ extension TSProgramAssociationSection {
       let pidBytes = Array(contentBytes.dropFirst(5))
       programMapPIDs = try stride(from: 0, through: pidBytes.count - 4, by: 4).map {
         try PIDEntry(bytes: Array(pidBytes[$0..<$0 + 4]))
-      }
-      crc = try UInt32(bigEndianBytes: bytes.suffix(4))
-      if crc != CRC32.calculate(contentBytes) {
-        throw AVMediaCodersError.invalidTS(.invalidCRC)
       }
     }
   }
