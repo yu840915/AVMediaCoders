@@ -6,6 +6,7 @@ struct TSHeader: Equatable {
   var adaptationFieldControl: AdaptationFieldControl {
     byteRepresentation.adaptationFieldControl
   }
+  let PID: TSPID
   var pid: UInt16 {
     byteRepresentation.pid
   }
@@ -18,14 +19,15 @@ struct TSHeader: Equatable {
 
   init(
     isStartOfPayload: Bool,
-    pid: UInt16,
+    PID: TSPID,
     adaptationFieldControl: AdaptationFieldControl,
     continuityCounter: UInt8
   ) {
+    self.PID = PID
     byteRepresentation = ByteRepresentation(
       transportErrorIndicator: false,
       payloadUnitStartIndicator: isStartOfPayload,
-      pid: pid,
+      pid: PID.value,
       adaptationFieldControl: adaptationFieldControl,
       continuityCounter: continuityCounter
     )
@@ -33,6 +35,7 @@ struct TSHeader: Equatable {
 
   init(bytes: [UInt8]) throws {
     byteRepresentation = try ByteRepresentation(bytes: bytes)
+    PID = try TSPID(rawValue: byteRepresentation.pid)
   }
 }
 

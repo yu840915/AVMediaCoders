@@ -1,10 +1,10 @@
 actor TSESPacketizer {
-  let pid: TSPID
+  let PID: TSPID
   private(set) var continuityCounter: UInt8
 
   init(pid: TSPID, continuityCounter: UInt8 = 0) {
     self.continuityCounter = continuityCounter
-    self.pid = pid
+    self.PID = pid
   }
 
   func packetize(
@@ -16,7 +16,7 @@ actor TSESPacketizer {
     var isStartOfPayload = true
     while !remainingData.isEmpty {
       let packet = TSPacket(
-        pid: pid.value,
+        PID: PID,
         continuityCounter: continuityCounter,
         isStartOfPayload: isStartOfPayload,
         adaptationFieldConfiguration: isStartOfPayload ? afConfig : nil,
@@ -33,7 +33,7 @@ actor TSESPacketizer {
   func createPaddings(count: Int = 1) -> [TSPacket] {
     return Array(
       repeating: TSPacket(
-        pid: pid.value,
+        PID: PID,
         continuityCounter: continuityCounter,
         isStartOfPayload: true,
         adaptationFieldConfiguration: nil,

@@ -10,7 +10,7 @@ struct TSESDepacketizerTests {
 
     let output = await sut.feed([
       TSPacket(
-        pid: pid.value,
+        PID: pid,
         continuityCounter: 0,
         isStartOfPayload: true,
         adaptationFieldConfiguration: nil,
@@ -29,7 +29,7 @@ struct TSESDepacketizerTests {
 
     _ = await sut.feed([
       TSPacket(
-        pid: pid.value,
+        PID: pid,
         continuityCounter: 0,
         isStartOfPayload: true,
         adaptationFieldConfiguration: nil,
@@ -50,7 +50,7 @@ struct TSESDepacketizerTests {
     _ = await sut.feed(
       [
         TSPacket(
-          pid: pid.value,
+          PID: pid,
           continuityCounter: 0,
           isStartOfPayload: true,
           adaptationFieldConfiguration: nil,
@@ -61,7 +61,7 @@ struct TSESDepacketizerTests {
     let output = await sut.feed(
       [
         TSPacket(
-          pid: pid.value,
+          PID: pid,
           continuityCounter: 1,
           isStartOfPayload: true,
           adaptationFieldConfiguration: nil,
@@ -82,7 +82,7 @@ struct TSESDepacketizerTests {
     _ = await sut.feed(
       [
         TSPacket(
-          pid: pid.value + 1,
+          PID: .dataStream(streamID: 0x1),
           continuityCounter: 1,
           isStartOfPayload: true,
           adaptationFieldConfiguration: nil,
@@ -102,7 +102,7 @@ struct TSESDepacketizerTests {
     _ = await sut.feed(
       [
         TSPacket(
-          pid: pid.value,
+          PID: pid,
           continuityCounter: 1,
           isStartOfPayload: false,
           adaptationFieldConfiguration: nil,

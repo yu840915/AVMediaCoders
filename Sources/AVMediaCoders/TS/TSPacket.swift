@@ -8,7 +8,7 @@ struct TSPacket: Equatable {
     var bytes: [UInt8] { header.bytes + payload.bytes }
 
     init(
-        pid: UInt16,
+        PID: TSPID,
         continuityCounter: UInt8,
         isStartOfPayload: Bool = false,
         adaptationFieldConfiguration afConfig: AdaptationFieldConfiguration? = nil,
@@ -32,7 +32,7 @@ struct TSPacket: Equatable {
         }
         header = TSHeader(
             isStartOfPayload: isStartOfPayload,
-            pid: pid,
+            PID: PID,
             adaptationFieldControl: payload.adaptationFieldControl,
             continuityCounter: continuityCounter
         )

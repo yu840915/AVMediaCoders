@@ -7,7 +7,7 @@ struct TSHeaderTests {
   func encodeSimpleHeader() async throws {
     let sut = TSHeader(
       isStartOfPayload: true,
-      pid: 0,
+      PID: .programAssociationTable,
       adaptationFieldControl: .payloadOnly,
       continuityCounter: 0
     )
@@ -21,19 +21,19 @@ struct TSHeaderTests {
     arguments: [
       TSHeader(
         isStartOfPayload: true,
-        pid: 0,
+        PID: .programAssociationTable,
         adaptationFieldControl: .payloadOnly,
         continuityCounter: 0
       ),
       TSHeader(
         isStartOfPayload: false,
-        pid: 0x1fff,
+        PID: .nullPacket,
         adaptationFieldControl: .adaptationFieldOnly,
         continuityCounter: 0x0f
       ),
       TSHeader(
         isStartOfPayload: false,
-        pid: 0x1fff,
+        PID: .nullPacket,
         adaptationFieldControl: .adaptationFieldAndPayload,
         continuityCounter: 0x0f
       ),

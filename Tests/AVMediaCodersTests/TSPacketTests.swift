@@ -6,10 +6,10 @@ struct TSPacketTests {
   @Test
   func simpleInitialization() async throws {
     let sut = TSPacket(
-      pid: 0xFF, continuityCounter: 0x2, data: [0x42]
+      PID: .dataStream(streamID: 1), continuityCounter: 0x2, data: [0x42]
     )
 
-    #expect(sut.header.pid == 0xFF)
+    #expect(sut.header.PID == .dataStream(streamID: 1))
     #expect(sut.header.continuityCounter == 0x2)
     guard case let .both(field, payload) = sut.payload else {
       throw TestError.unexpectedValue
@@ -22,10 +22,11 @@ struct TSPacketTests {
   @Test
   func discardExcessiveDataWithoutHeader() async throws {
     let sut = TSPacket(
-      pid: 0xFF, continuityCounter: 0x2, data: Array(repeating: 0x42, count: 200)
+      PID: .dataStream(streamID: 1), continuityCounter: 0x2,
+      data: Array(repeating: 0x42, count: 200)
     )
 
-    #expect(sut.header.pid == 0xFF)
+    #expect(sut.header.PID == .dataStream(streamID: 1))
     #expect(sut.header.continuityCounter == 0x2)
     guard case let .dataPayload(payload) = sut.payload else {
       throw TestError.unexpectedValue
@@ -37,7 +38,7 @@ struct TSPacketTests {
   @Test
   func discardExcessiveDataWithHeader() async throws {
     let sut = TSPacket(
-      pid: 0xFF,
+      PID: .dataStream(streamID: 1),
       continuityCounter: 0x2,
       adaptationFieldConfiguration: TSPacket.AdaptationFieldConfiguration(
         pcr: TSClockReference(0x1_FFFF_FFFF),
@@ -47,7 +48,7 @@ struct TSPacketTests {
       data: Array(repeating: 0x42, count: 200)
     )
 
-    #expect(sut.header.pid == 0xFF)
+    #expect(sut.header.PID == .dataStream(streamID: 1))
     #expect(sut.header.continuityCounter == 0x2)
     guard case let .both(_, payload) = sut.payload else {
       throw TestError.unexpectedValue
@@ -58,9 +59,9 @@ struct TSPacketTests {
 
   @Test
   func allPadding() async throws {
-    let sut = TSPacket(pid: 0xFF, continuityCounter: 0x2)
+    let sut = TSPacket(PID: .dataStream(streamID: 1), continuityCounter: 0x2)
 
-    #expect(sut.header.pid == 0xFF)
+    #expect(sut.header.PID == .dataStream(streamID: 1))
     #expect(sut.header.continuityCounter == 0x2)
     guard case let .adaptationField(field) = sut.payload else {
       throw TestError.unexpectedValue
@@ -70,8 +71,8 @@ struct TSPacketTests {
   }
 
   @Test(arguments: [
-    TSPacket(pid: 0xFF, continuityCounter: 0x2),
-    TSPacket(pid: 0xFF, continuityCounter: 0x2, data: [0x42]),
+    TSPacket(PID: .dataStream(streamID: 1), continuityCounter: 0x2),
+    TSPacket(PID: .dataStream(streamID: 1), continuityCounter: 0x2, data: [0x42]),
   ])
   func encodeDecode(_ src: TSPacket) async throws {
     let bytes = src.bytes
@@ -83,7 +84,7 @@ struct TSPacketTests {
 
   @Test
   func detectInsufficientBuffer() async throws {
-    let bytes = TSPacket(pid: 0xFF, continuityCounter: 0x2, data: [0x42]).bytes
+    let bytes = TSPacket(PID: .dataStream(streamID: 1), continuityCounter: 0x2, data: [0x42]).bytes
 
     #expect(throws: AVMediaCodersError.bufferTooShort) {
       try TSPacket(bytes: Array(bytes[0..<bytes.count - 1]))
@@ -92,7 +93,7 @@ struct TSPacketTests {
 
   @Test
   func retainOnlyRelevantBytes() async throws {
-    let src = TSPacket(pid: 0xFF, continuityCounter: 0x2, data: [0x42])
+    let src = TSPacket(PID: .dataStream(streamID: 1), continuityCounter: 0x2, data: [0x42])
     let bytes = src.bytes + [0x47]
 
     let sut = try TSPacket(bytes: bytes)
