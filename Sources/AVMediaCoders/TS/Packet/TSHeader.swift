@@ -1,4 +1,4 @@
-struct TSHeader: Equatable {
+struct TSHeader: Equatable, Sendable {
   let byteRepresentation: ByteRepresentation
   var isStartOfPayload: Bool {
     byteRepresentation.payloadUnitStartIndicator
@@ -40,7 +40,7 @@ struct TSHeader: Equatable {
 }
 
 extension TSHeader {
-  struct ByteRepresentation: Equatable {
+  struct ByteRepresentation: Equatable, Sendable {
     let syncByte: UInt8 = 0x47
     let transportErrorIndicator: Bool
     let payloadUnitStartIndicator: Bool
@@ -109,14 +109,14 @@ extension TSHeader {
     }
   }
 
-  enum ScramblingControl: UInt8, Equatable {
+  enum ScramblingControl: UInt8, Equatable, Sendable {
     case notScrambling = 0b00
     case reserved = 0b01
     case evenKeyScrambled = 0b10
     case oddKeyScrambled = 0b11
   }
 
-  enum AdaptationFieldControl: UInt8 {
+  enum AdaptationFieldControl: UInt8, Equatable, Sendable {
     case reserved = 0b00
     case payloadOnly = 0b01
     case adaptationFieldOnly = 0b10

@@ -1,15 +1,15 @@
-struct TSAdaptationField: Equatable {
+struct TSAdaptationField: Equatable, Sendable {
   static let minimumLength: UInt8 = 2
   static let maximumLength: UInt8 = 184
   let length: UInt8
   let pcr: TSClockReference?
   let opcr: TSClockReference?
   var randomAccessIndicator: Bool {
-    flags.randomAccessIndicator
+    byteRepresentation.randomAccessIndicator
   }
   let spliceCountdown: UInt8?
   let transportPrivateData: [UInt8]?
-  let flags: Flags
+  let byteRepresentation: ByteRepresentation
 
   let bytes: [UInt8]
 
@@ -21,7 +21,7 @@ struct TSAdaptationField: Equatable {
   ) {
     self.pcr = pcr
     self.opcr = opcr
-    flags = Flags(
+    byteRepresentation = ByteRepresentation(
       discontinuityIndicator: false,
       randomAccessIndicator: randomAccessIndicator,
       elementaryStreamPriorityIndicator: false,
@@ -33,7 +33,7 @@ struct TSAdaptationField: Equatable {
     )
     self.spliceCountdown = nil
     self.transportPrivateData = nil
-    let bytes: [UInt8] = flags.bytes + (pcr?.bytes ?? []) + (opcr?.bytes ?? [])
+    let bytes: [UInt8] = byteRepresentation.bytes + (pcr?.bytes ?? []) + (opcr?.bytes ?? [])
     let fieldLength = UInt8(bytes.count)
     let stuffingLength = UInt8(
       max(
@@ -49,31 +49,31 @@ struct TSAdaptationField: Equatable {
     guard bytes.count >= 2 else {
       throw AVMediaCodersError.bufferTooShort
     }
-    flags = try Flags(bytes: Array(bytes[1...1]))
+    byteRepresentation = try ByteRepresentation(bytes: Array(bytes[1...1]))
     var remainingBytes = Array(bytes[2...])
     length = bytes[0]
     guard bytes.count > length else {
       throw AVMediaCodersError.bufferTooShort
     }
-    if flags.pcrFlag {
+    if byteRepresentation.pcrFlag {
       pcr = try TSClockReference(bytes: Array(remainingBytes[0...5]))
       remainingBytes = Array(remainingBytes[6...])
     } else {
       pcr = nil
     }
-    if flags.opcrFlag {
+    if byteRepresentation.opcrFlag {
       opcr = try TSClockReference(bytes: Array(remainingBytes[0...5]))
       remainingBytes = Array(remainingBytes[6...])
     } else {
       opcr = nil
     }
-    if flags.splicingPointFlag {
+    if byteRepresentation.splicingPointFlag {
       spliceCountdown = remainingBytes[0]
       remainingBytes = Array(remainingBytes[1...])
     } else {
       spliceCountdown = nil
     }
-    if flags.transportPrivateDataFlag {
+    if byteRepresentation.transportPrivateDataFlag {
       let length = remainingBytes[0]
       transportPrivateData = Array(remainingBytes[1...Int(length)])
       remainingBytes = Array(remainingBytes[Int(length + 1)...])
@@ -85,7 +85,7 @@ struct TSAdaptationField: Equatable {
 }
 
 extension TSAdaptationField {
-  struct Flags: Equatable {
+  struct ByteRepresentation: Equatable, Sendable {
     let discontinuityIndicator: Bool
     let randomAccessIndicator: Bool
     let elementaryStreamPriorityIndicator: Bool
@@ -142,7 +142,7 @@ extension TSAdaptationField {
   }
 }
 
-struct AdaptationFieldExtension: Equatable {
+struct AdaptationFieldExtension: Equatable, Sendable {
   let length: UInt8
   let legalTimeWindowFlag: Bool
   let piecewiseRateFlag: Bool
@@ -154,7 +154,7 @@ struct AdaptationFieldExtension: Equatable {
 }
 
 extension AdaptationFieldExtension {
-  struct ByteRepresentation {
+  struct ByteRepresentation: Equatable, Sendable {
     let length: UInt8
     let legalTimeWindowFlag: Bool
     let piecewiseRateFlag: Bool

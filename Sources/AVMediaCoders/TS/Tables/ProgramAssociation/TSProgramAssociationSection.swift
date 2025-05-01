@@ -1,4 +1,4 @@
-struct TSProgramAssociationSection: Equatable {
+struct TSProgramAssociationSection: Equatable, Sendable {
   let tableHeader: TSTableHeader
   let byteRepresentation: ByteRepresentation
   var bytes: [UInt8] {
@@ -71,7 +71,7 @@ extension TSProgramAssociationSection {
 }
 
 extension TSProgramAssociationSection {
-  struct ByteRepresentation: Equatable {
+  struct ByteRepresentation: Equatable, Sendable {
     static let nonPayloadByteLength = 9
     let transportStreamId: UInt16
     let versionNumber: UInt8
@@ -86,7 +86,7 @@ extension TSProgramAssociationSection {
 
     let bytes: [UInt8]
 
-    struct PIDEntry: Equatable {
+    struct PIDEntry: Equatable, Sendable {
       let programNumber: UInt16
       let programMapPID: UInt16
 
@@ -153,7 +153,7 @@ extension TSProgramAssociationSection {
     }
   }
 
-  struct TSPIDEntry: Equatable {
+  struct TSPIDEntry: Equatable, Sendable {
     var byteLength: UInt8 { 4 }
     let programNumber: UInt16
     let PID: TSPID

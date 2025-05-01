@@ -1,4 +1,4 @@
-struct TSProgramAssociationTable: Equatable {
+struct TSProgramAssociationTable: Equatable, Sendable {
   private(set) var versionNumber: UInt8
   private(set) var programs: [UInt16: TSPID] {
     didSet {

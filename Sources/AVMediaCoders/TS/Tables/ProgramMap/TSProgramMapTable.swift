@@ -1,4 +1,4 @@
-struct TSProgramMapTable: Equatable {
+struct TSProgramMapTable: Equatable, Sendable {
   let programNumber: UInt16
   private(set) var versionNumber: UInt8
   private(set) var PCRPID: TSPID

@@ -1,4 +1,4 @@
-struct TSPacket: Equatable {
+struct TSPacket: Equatable, Sendable {
     let packetSize = 188
     let headerSize = 4
     let payloadSize = 184
@@ -52,7 +52,7 @@ struct TSPacket: Equatable {
 }
 
 extension TSPacket {
-    enum Payload: Equatable {
+    enum Payload: Equatable, Sendable {
         case adaptationField(TSAdaptationField)
         case dataPayload([UInt8])
         case both(TSAdaptationField, [UInt8])
@@ -115,7 +115,7 @@ extension TSPacket {
         }
     }
 
-    struct AdaptationFieldConfiguration: Equatable {
+    struct AdaptationFieldConfiguration: Equatable, Sendable {
         let pcr: TSClockReference?
         let opcr: TSClockReference?
         let allowRandomAccess: Bool

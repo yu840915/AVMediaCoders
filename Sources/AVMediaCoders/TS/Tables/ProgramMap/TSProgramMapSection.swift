@@ -1,4 +1,4 @@
-struct TSProgramMapSection: Equatable {
+struct TSProgramMapSection: Equatable, Sendable {
   let tableHeader: TSTableHeader
   var programNumber: UInt16 {
     byteRepresentation.programNumber
@@ -65,7 +65,7 @@ struct TSProgramMapSection: Equatable {
 }
 
 extension TSProgramMapSection {
-  struct ByteRepresentation: Equatable {
+  struct ByteRepresentation: Equatable, Sendable {
     let programNumber: UInt16
     let versionNumber: UInt8
     let currentNextIndicator: Bool

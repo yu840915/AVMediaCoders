@@ -1,4 +1,4 @@
-struct TSProgramElementInfo: Equatable {
+struct TSProgramElementInfo: Equatable, Sendable {
   let streamType: TSStreamType
   let elementaryPID: TSPID
   let byteRepresentation: ByteRepresentation
@@ -31,7 +31,7 @@ struct TSProgramElementInfo: Equatable {
 }
 
 extension TSProgramElementInfo {
-  struct ByteRepresentation: Equatable {
+  struct ByteRepresentation: Equatable, Sendable {
     let streamType: UInt8
     let elementaryPID: UInt16
     let ESInfoLength: UInt16
