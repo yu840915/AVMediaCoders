@@ -18,8 +18,8 @@ struct TSProgramMapTableTests {
   func updateProgramInfoAndIncrementVersion() async throws {
     var sut = TSProgramMapTable(programNumber: 1)
 
-    sut.update { _, programInfo, _ in
-      programInfo.append(0x01)
+    sut.update {
+      $0.programInfo.append(0x01)
     }
 
     #expect(sut.versionNumber == 1)
@@ -30,8 +30,8 @@ struct TSProgramMapTableTests {
   func updatePCRPIDAndIncrementVersion() async throws {
     var sut = TSProgramMapTable(programNumber: 1)
 
-    sut.update { PCRPID, _, _ in
-      PCRPID = .dataStream(streamID: 0x01)
+    sut.update {
+      $0.PCRPID = .dataStream(streamID: 0x01)
     }
 
     #expect(sut.versionNumber == 1)
@@ -42,8 +42,8 @@ struct TSProgramMapTableTests {
   func updateProgramElementInfosAndIncrementVersion() async throws {
     var sut = TSProgramMapTable(programNumber: 1)
 
-    sut.update { _, _, programElementInfos in
-      programElementInfos.append(
+    sut.update {
+      $0.programElementInfos.append(
         TSProgramElementInfo(
           streamType: .videoHEVC,
           elementaryPID: .dataStream(streamID: 0x01),
@@ -68,10 +68,10 @@ struct TSProgramMapTableTests {
   func updateAndIncrementVersion() async throws {
     var sut = TSProgramMapTable(programNumber: 1)
 
-    sut.update { PCRPID, programInfo, programElementInfos in
-      PCRPID = .dataStream(streamID: 0x01)
-      programInfo.append(0x01)
-      programElementInfos.append(
+    sut.update {
+      $0.PCRPID = .dataStream(streamID: 0x01)
+      $0.programInfo.append(0x01)
+      $0.programElementInfos.append(
         TSProgramElementInfo(
           streamType: .videoHEVC,
           elementaryPID: .dataStream(streamID: 0x01),
@@ -102,8 +102,8 @@ struct TSProgramMapTableTests {
   func doNotIncrementIfNotChanged() async throws {
     var sut = TSProgramMapTable(programNumber: 1)
 
-    sut.update { _, programInfo, _ in
-      programInfo.removeAll()
+    sut.update {
+      $0.programInfo.removeAll()
     }
 
     #expect(sut.versionNumber == 0)
@@ -117,8 +117,8 @@ struct TSProgramMapTableTests {
       programInfo: [0x42]
     )
 
-    sut.update { _, programInfo, _ in
-      programInfo.removeAll()
+    sut.update {
+      $0.programInfo.removeAll()
     }
 
     #expect(

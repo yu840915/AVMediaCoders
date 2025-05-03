@@ -28,8 +28,8 @@ struct TSProgramAssociationTableTests {
 
     sut.update(
       {
-        $0[1] = .dataStream(streamID: 0x01)
-        $0[2] = .dataStream(streamID: 0x04)
+        $0.programs[1] = .dataStream(streamID: 0x01)
+        $0.programs[2] = .dataStream(streamID: 0x04)
       }
     )
 
@@ -54,8 +54,8 @@ struct TSProgramAssociationTableTests {
 
     sut.update(
       {
-        $0[1] = .dataStream(streamID: 0x01)
-        $0[2] = .dataStream(streamID: 0x04)
+        $0.programs[1] = .dataStream(streamID: 0x01)
+        $0.programs[2] = .dataStream(streamID: 0x04)
       }
     )
 
@@ -74,8 +74,8 @@ struct TSProgramAssociationTableTests {
 
     sut.update(
       {
-        $0[1] = .dataStream(streamID: 0x01)
-        $0[2] = .dataStream(streamID: 0x04)
+        $0.programs[1] = .dataStream(streamID: 0x01)
+        $0.programs[2] = .dataStream(streamID: 0x04)
       }
     )
 

@@ -19,6 +19,20 @@ struct TSProgramMapTable: Equatable, Sendable {
     self.programElementInfos = programElementInfos
   }
 
+  init(
+    programNumber: UInt16,
+    versionNumber: UInt8 = 0,
+    update: Update
+  ) {
+    self.init(
+      programNumber: programNumber,
+      versionNumber: versionNumber,
+      PCRPID: update.PCRPID,
+      programInfo: update.programInfo,
+      programElementInfos: update.programElementInfos
+    )
+  }
+
   init(section: TSProgramMapSection) {
     self.programNumber = section.programNumber
     self.versionNumber = section.versionNumber
@@ -27,16 +41,18 @@ struct TSProgramMapTable: Equatable, Sendable {
     self.programElementInfos = section.programElementInfos
   }
 
-  mutating func update(
-    _ updater: (inout TSPID, inout [UInt8], inout [TSProgramElementInfo]) -> Void
-  ) {
-    let oldPCRPID = PCRPID
-    let oldProgramInfo = programInfo
-    let oldProgramElementInfos = programElementInfos
-    updater(&PCRPID, &programInfo, &programElementInfos)
-    if oldPCRPID != PCRPID || oldProgramInfo != programInfo
-      || oldProgramElementInfos != programElementInfos
-    {
+  mutating func update(_ update: (inout Update) -> Void) {
+    var draft = Update(
+      PCRPID: PCRPID,
+      programInfo: programInfo,
+      programElementInfos: programElementInfos
+    )
+    let oldValues = draft
+    update(&draft)
+    if oldValues != draft {
+      PCRPID = draft.PCRPID
+      programInfo = draft.programInfo
+      programElementInfos = draft.programElementInfos
       incrementVersion()
     }
   }
@@ -57,5 +73,13 @@ struct TSProgramMapTable: Equatable, Sendable {
       programInfo: programInfo,
       programElementInfos: programElementInfos
     )
+  }
+}
+
+extension TSProgramMapTable {
+  struct Update: Equatable, Sendable {
+    var PCRPID: TSPID
+    var programInfo: [UInt8]
+    var programElementInfos: [TSProgramElementInfo]
   }
 }

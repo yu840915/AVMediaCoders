@@ -1,16 +1,6 @@
 struct TSProgramAssociationTable: Equatable, Sendable {
   private(set) var versionNumber: UInt8
-  private(set) var programs: [UInt16: TSPID] {
-    didSet {
-      if oldValue != programs {
-        if versionNumber < 0x1F {
-          versionNumber += 1
-        } else {
-          versionNumber = 0
-        }
-      }
-    }
-  }
+  private(set) var programs: [UInt16: TSPID]
 
   init(
     versionNumber: UInt8 = 0,
@@ -37,9 +27,23 @@ struct TSProgramAssociationTable: Equatable, Sendable {
   }
 
   mutating func update(
-    _ updater: (inout [UInt16: TSPID]) -> Void
+    _ update: (inout Update) -> Void
   ) {
-    updater(&programs)
+    var draft = Update(programs: programs)
+    let oldValues = draft
+    update(&draft)
+    if oldValues != draft {
+      programs = draft.programs
+      incrementVersion()
+    }
+  }
+
+  private mutating func incrementVersion() {
+    if versionNumber < 0x1F {
+      versionNumber += 1
+    } else {
+      versionNumber = 0
+    }
   }
 
   func convertToSections() -> [TSProgramAssociationSection] {
@@ -59,5 +63,11 @@ struct TSProgramAssociationTable: Equatable, Sendable {
         programMapPIDs: Array(pids[start..<end])
       )
     }
+  }
+}
+
+extension TSProgramAssociationTable {
+  struct Update: Equatable, Sendable {
+    var programs: [UInt16: TSPID]
   }
 }
