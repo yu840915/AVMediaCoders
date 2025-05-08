@@ -1,6 +1,6 @@
 private let logger = Loggers.tsDepacketizing.build()
 
-actor TSESDepacketizer {
+class TSDataDepacketizer {
   let pid: TSPID
   private(set) var stashedPackets: [TSPacket] = []
 
@@ -57,7 +57,7 @@ actor TSESDepacketizer {
 
 }
 
-extension TSESDepacketizer {
+extension TSDataDepacketizer {
   struct Output: Equatable {
     let esData: [UInt8]
     let adaptationField: TSAdaptationField?

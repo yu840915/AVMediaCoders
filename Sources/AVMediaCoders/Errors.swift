@@ -45,4 +45,5 @@ enum TSError: Error, Equatable {
   case invalidCRC
   case invalidSectionNumber
   case inconsistentVersion
+  case dataStreamPIDMismatch
 }

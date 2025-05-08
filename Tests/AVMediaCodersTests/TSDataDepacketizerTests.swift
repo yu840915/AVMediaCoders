@@ -2,13 +2,13 @@ import Testing
 
 @testable import AVMediaCoders
 
-struct TSESDepacketizerTests {
+struct TSDataDepacketizerTests {
   @Test
   func stashPacket() async throws {
     let pid = TSPID.dataStream(streamID: 0x0)
-    let sut = TSESDepacketizer(pid: pid)
+    let sut = TSDataDepacketizer(pid: pid)
 
-    let output = await sut.feed([
+    let output = sut.feed([
       TSPacket(
         PID: pid,
         continuityCounter: 0,
@@ -19,15 +19,15 @@ struct TSESDepacketizerTests {
     ])
 
     #expect(output.isEmpty)
-    #expect((await sut.stashedPackets.count) == 1)
+    #expect((sut.stashedPackets.count) == 1)
   }
 
   @Test
   func flush() async throws {
     let pid = TSPID.dataStream(streamID: 0x0)
-    let sut = TSESDepacketizer(pid: pid)
+    let sut = TSDataDepacketizer(pid: pid)
 
-    _ = await sut.feed([
+    _ = sut.feed([
       TSPacket(
         PID: pid,
         continuityCounter: 0,
@@ -36,18 +36,18 @@ struct TSESDepacketizerTests {
         data: [0xAA]
       )
     ])
-    let output = await sut.flush()
+    let output = sut.flush()
 
     #expect(output?.esData == [0xAA])
-    #expect(await sut.stashedPackets.isEmpty)
+    #expect(sut.stashedPackets.isEmpty)
   }
 
   @Test
   func flushOnNextStart() async throws {
     let pid = TSPID.dataStream(streamID: 0x0)
-    let sut = TSESDepacketizer(pid: pid)
+    let sut = TSDataDepacketizer(pid: pid)
 
-    _ = await sut.feed(
+    _ = sut.feed(
       [
         TSPacket(
           PID: pid,
@@ -58,7 +58,7 @@ struct TSESDepacketizerTests {
         )
       ]
     )
-    let output = await sut.feed(
+    let output = sut.feed(
       [
         TSPacket(
           PID: pid,
@@ -77,9 +77,9 @@ struct TSESDepacketizerTests {
   @Test
   func skipPacketForMismatchingPID() async throws {
     let pid = TSPID.dataStream(streamID: 0x0)
-    let sut = TSESDepacketizer(pid: pid)
+    let sut = TSDataDepacketizer(pid: pid)
 
-    _ = await sut.feed(
+    _ = sut.feed(
       [
         TSPacket(
           PID: .dataStream(streamID: 0x1),
@@ -91,15 +91,15 @@ struct TSESDepacketizerTests {
       ]
     )
 
-    #expect(await sut.stashedPackets.isEmpty)
+    #expect(sut.stashedPackets.isEmpty)
   }
 
   @Test
   func skipPacketsIfNotStarted() async throws {
     let pid = TSPID.dataStream(streamID: 0x0)
-    let sut = TSESDepacketizer(pid: pid)
+    let sut = TSDataDepacketizer(pid: pid)
 
-    _ = await sut.feed(
+    _ = sut.feed(
       [
         TSPacket(
           PID: pid,
@@ -111,28 +111,28 @@ struct TSESDepacketizerTests {
       ]
     )
 
-    #expect(await sut.stashedPackets.isEmpty)
+    #expect(sut.stashedPackets.isEmpty)
   }
 
   @Test
   func packetizeDepacketize() async throws {
     let pid = TSPID.dataStream(streamID: 0x0)
-    let sut = TSESDepacketizer(pid: pid)
-    let packetizer = TSESPacketizer(pid: pid)
+    let sut = TSDataDepacketizer(pid: pid)
+    let packetizer = TSDataPacketizer(pid: pid)
 
     let input = [UInt8](repeating: 0xAA, count: 1000)
 
-    let packets = await packetizer.packetize(
+    let packets = packetizer.packetize(
       adaptationFieldConfiguration: .init(
         pcr: TSClockReference(0x1_FFFF_FFFF),
         opcr: nil,
         allowRandomAccess: true
       ),
-      esData: input
+      data: input
     )
 
-    _ = await sut.feed(packets)
-    let output = await sut.flush()
+    _ = sut.feed(packets)
+    let output = sut.flush()
 
     #expect(output?.esData == input)
     #expect(output?.adaptationField?.pcr == TSClockReference(0x1_FFFF_FFFF))
@@ -142,21 +142,21 @@ struct TSESDepacketizerTests {
   @Test
   func serialDepacketizing() async throws {
     let pid = TSPID.dataStream(streamID: 0x0)
-    let sut = TSESDepacketizer(pid: pid)
-    let packetizer = TSESPacketizer(pid: pid, continuityCounter: 0x0E)
+    let sut = TSDataDepacketizer(pid: pid)
+    let packetizer = TSDataPacketizer(pid: pid, continuityCounter: 0x0E)
 
     let input = [UInt8](repeating: 0xAA, count: 1000)
     let input2 = [UInt8](repeating: 0xAB, count: 280)
     let input3 = [UInt8](repeating: 0xAA, count: 255)
 
     let packets =
-      await packetizer.packetize(
+      packetizer.packetize(
         adaptationFieldConfiguration: .init(
           pcr: TSClockReference(0x1),
           opcr: nil,
           allowRandomAccess: true
         ),
-        esData: input
+        data: input
       ) + packetizer.createPaddings(count: 2)
       + packetizer.packetize(
         adaptationFieldConfiguration: .init(
@@ -164,7 +164,7 @@ struct TSESDepacketizerTests {
           opcr: nil,
           allowRandomAccess: false
         ),
-        esData: input2
+        data: input2
       ) + packetizer.createPaddings(count: 12)
       + packetizer.packetize(
         adaptationFieldConfiguration: .init(
@@ -172,10 +172,10 @@ struct TSESDepacketizerTests {
           opcr: nil,
           allowRandomAccess: false
         ),
-        esData: input3
+        data: input3
       )
 
-    let outputs = await sut.feed(packets)
+    let outputs = sut.feed(packets)
 
     #expect(outputs.map { $0.esData } == [input, input2])
     #expect(
@@ -189,23 +189,23 @@ struct TSESDepacketizerTests {
   @Test
   func checkContinuity() async throws {
     let pid = TSPID.dataStream(streamID: 0x0)
-    let sut = TSESDepacketizer(pid: pid)
-    let packetizer = TSESPacketizer(pid: pid, continuityCounter: 0x0E)
+    let sut = TSDataDepacketizer(pid: pid)
+    let packetizer = TSDataPacketizer(pid: pid, continuityCounter: 0x0E)
 
     let input = [UInt8](repeating: 0xAA, count: 1000)
 
     let packets =
-      await packetizer.packetize(
+      packetizer.packetize(
         adaptationFieldConfiguration: .init(
           pcr: TSClockReference(0x1),
           opcr: nil,
           allowRandomAccess: true
         ),
-        esData: input
+        data: input
       ).filter { $0.header.continuityCounter != 0x02 }
       + packetizer.createPaddings(count: 1)
 
-    let outputs = await sut.feed(Array(packets))
+    let outputs = sut.feed(Array(packets))
 
     #expect(outputs.isEmpty)
   }

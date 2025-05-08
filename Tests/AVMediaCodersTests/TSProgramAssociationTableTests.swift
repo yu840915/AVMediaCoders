@@ -83,6 +83,25 @@ struct TSProgramAssociationTableTests {
   }
 
   @Test
+  func convertEmptyTableToSections() async throws {
+    let sut = TSProgramAssociationTable(
+      versionNumber: 0,
+      programs: [:]
+    )
+
+    let sections = sut.convertToSections()
+
+    #expect(
+      sections == [
+        try! TSProgramAssociationSection(
+          versionNumber: 0, sectionNumber: 0, lastSectionNumber: 0,
+          programMapPIDs: []
+        )
+      ]
+    )
+  }
+
+  @Test
   func convertSmallTableToSections() async throws {
     let sut = TSProgramAssociationTable(
       versionNumber: 0,

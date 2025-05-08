@@ -17,19 +17,20 @@ struct TSProgramMapTable: Equatable, Sendable {
     self.PCRPID = PCRPID
     self.programInfo = programInfo
     self.programElementInfos = programElementInfos
+    assertValid()
   }
 
   init(
     programNumber: UInt16,
     versionNumber: UInt8 = 0,
-    update: Update
+    parameters: Parameters
   ) {
     self.init(
       programNumber: programNumber,
       versionNumber: versionNumber,
-      PCRPID: update.PCRPID,
-      programInfo: update.programInfo,
-      programElementInfos: update.programElementInfos
+      PCRPID: parameters.PCRPID,
+      programInfo: parameters.programInfo,
+      programElementInfos: parameters.programElementInfos
     )
   }
 
@@ -41,8 +42,8 @@ struct TSProgramMapTable: Equatable, Sendable {
     self.programElementInfos = section.programElementInfos
   }
 
-  mutating func update(_ update: (inout Update) -> Void) {
-    var draft = Update(
+  mutating func update(_ update: (inout Parameters) -> Void) {
+    var draft = Parameters(
       PCRPID: PCRPID,
       programInfo: programInfo,
       programElementInfos: programElementInfos
@@ -54,7 +55,18 @@ struct TSProgramMapTable: Equatable, Sendable {
       programInfo = draft.programInfo
       programElementInfos = draft.programElementInfos
       incrementVersion()
+      assertValid()
     }
+  }
+
+  private func assertValid() {
+    guard !programElementInfos.isEmpty else {
+      return
+    }
+    assert(
+      programElementInfos.map { $0.elementaryPID }.contains(PCRPID),
+      "PCRPID must be one of the elementary PIDs"
+    )
   }
 
   private mutating func incrementVersion() {
@@ -77,7 +89,7 @@ struct TSProgramMapTable: Equatable, Sendable {
 }
 
 extension TSProgramMapTable {
-  struct Update: Equatable, Sendable {
+  struct Parameters: Equatable, Sendable {
     var PCRPID: TSPID
     var programInfo: [UInt8]
     var programElementInfos: [TSProgramElementInfo]

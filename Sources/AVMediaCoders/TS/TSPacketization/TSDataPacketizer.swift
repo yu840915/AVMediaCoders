@@ -1,4 +1,4 @@
-actor TSESPacketizer {
+class TSDataPacketizer {
   let PID: TSPID
   private(set) var continuityCounter: UInt8
 
@@ -7,12 +7,26 @@ actor TSESPacketizer {
     self.PID = pid
   }
 
+  func packetize(sectionData: [UInt8]) -> [TSPacket] {
+    packetize(adaptationFieldConfiguration: nil, data: sectionData)
+  }
+
   func packetize(
     adaptationFieldConfiguration afConfig: TSPacket.AdaptationFieldConfiguration?,
     esData: [UInt8]
   ) -> [TSPacket] {
+    packetize(
+      adaptationFieldConfiguration: afConfig,
+      data: esData
+    )
+  }
+
+  func packetize(
+    adaptationFieldConfiguration afConfig: TSPacket.AdaptationFieldConfiguration? = nil,
+    data: [UInt8]
+  ) -> [TSPacket] {
     var packets: [TSPacket] = []
-    var remainingData = esData
+    var remainingData = data
     var isStartOfPayload = true
     while !remainingData.isEmpty {
       let packet = TSPacket(

@@ -27,9 +27,9 @@ struct TSProgramAssociationTable: Equatable, Sendable {
   }
 
   mutating func update(
-    _ update: (inout Update) -> Void
+    _ update: (inout Parameters) -> Void
   ) {
-    var draft = Update(programs: programs)
+    var draft = Parameters(programs: programs)
     let oldValues = draft
     update(&draft)
     if oldValues != draft {
@@ -47,6 +47,16 @@ struct TSProgramAssociationTable: Equatable, Sendable {
   }
 
   func convertToSections() -> [TSProgramAssociationSection] {
+    if programs.isEmpty {
+      return [
+        try! TSProgramAssociationSection(
+          versionNumber: versionNumber,
+          sectionNumber: 0,
+          lastSectionNumber: 0,
+          programMapPIDs: []
+        )
+      ]
+    }
     let pids = programs.keys.sorted().map {
       TSProgramAssociationSection.TSPIDEntry(programNumber: $0, PID: programs[$0]!)
     }
@@ -67,7 +77,7 @@ struct TSProgramAssociationTable: Equatable, Sendable {
 }
 
 extension TSProgramAssociationTable {
-  struct Update: Equatable, Sendable {
+  struct Parameters: Equatable, Sendable {
     var programs: [UInt16: TSPID]
   }
 }

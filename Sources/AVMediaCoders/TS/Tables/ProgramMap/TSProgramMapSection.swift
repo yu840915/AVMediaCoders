@@ -1,4 +1,4 @@
-struct TSProgramMapSection: Equatable, Sendable {
+struct TSProgramMapSection: TSTableSection {
   let tableHeader: TSTableHeader
   var programNumber: UInt16 {
     byteRepresentation.programNumber
@@ -44,7 +44,7 @@ struct TSProgramMapSection: Equatable, Sendable {
   }
 
   init(bytes: [UInt8]) throws {
-    tableHeader = try TSTableHeader(bytes: bytes)    
+    tableHeader = try TSTableHeader(bytes: bytes)
     guard tableHeader.tableID == .TSProgramMapSection else {
       throw AVMediaCodersError.invalidTS(.invalidHeader)
     }

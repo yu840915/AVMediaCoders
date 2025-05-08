@@ -14,7 +14,13 @@ let package = Package(
             name: "AVMediaCoders",
             targets: ["AVMediaCoders"])
     ],
-    dependencies: [],
+    dependencies: [
+        .package(
+            name: "AsyncUtils",
+            path: "file:///Users/lixuanyu/swift_proj.nosync/AsyncUtils"
+        )
+    ],
+
     targets: [
         .target(
             name: "AVMediaCoders",
@@ -22,7 +28,10 @@ let package = Package(
         ),
         .testTarget(
             name: "AVMediaCodersTests",
-            dependencies: ["AVMediaCoders"]
+            dependencies: [
+                "AVMediaCoders",
+                "AsyncUtils",
+            ]
         ),
     ]
 )

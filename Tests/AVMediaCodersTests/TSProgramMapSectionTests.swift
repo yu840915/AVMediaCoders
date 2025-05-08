@@ -308,7 +308,6 @@ struct TSProgramMapSectionTests {
   func rejectNonZeroSectionNumber(
     _ bytes: [UInt8]
   ) async throws {
-    print(CRC32.calculate(bytes))
     #expect(throws: AVMediaCodersError.invalidTS(.invalidSectionNumber)) {
       try TSProgramMapSection(bytes: bytes)
     }

@@ -2,21 +2,21 @@ import Testing
 
 @testable import AVMediaCoders
 
-struct TSESPacketizerTests {
+struct TSDataPacketizerTests {
   @Test
   func packetizeMockIFrame() async throws {
     let pid = TSPID.dataStream(streamID: 0x0)
-    let sut = TSESPacketizer(pid: pid)
+    let sut = TSDataPacketizer(pid: pid)
 
     let input = [UInt8](repeating: 0xAA, count: 1000)
 
-    let packets = await sut.packetize(
+    let packets = sut.packetize(
       adaptationFieldConfiguration: .init(
         pcr: TSClockReference(0x1_FFFF_FFFF),
         opcr: nil,
         allowRandomAccess: true
       ),
-      esData: input
+      data: input
     )
 
     #expect(packets.count == 6)
@@ -42,20 +42,20 @@ struct TSESPacketizerTests {
 
   @Test
   func continuityCounterRevolve() async throws {
-    let sut = TSESPacketizer(
+    let sut = TSDataPacketizer(
       pid: .dataStream(streamID: 0x0),
       continuityCounter: 0x0D
     )
 
     let input = [UInt8](repeating: 0xAA, count: 1000)
 
-    let packets = await sut.packetize(
+    let packets = sut.packetize(
       adaptationFieldConfiguration: .init(
         pcr: TSClockReference(0x1_FFFF_FFFF),
         opcr: nil,
         allowRandomAccess: true
       ),
-      esData: input
+      data: input
     )
 
     #expect(packets.count == 6)
@@ -68,12 +68,12 @@ struct TSESPacketizerTests {
   @Test
   func packetizePadding() async throws {
     let pid = TSPID.dataStream(streamID: 0x0)
-    let sut = TSESPacketizer(
+    let sut = TSDataPacketizer(
       pid: pid,
       continuityCounter: 0x0D
     )
 
-    let packets = await sut.createPaddings(count: 3)
+    let packets = sut.createPaddings(count: 3)
 
     #expect(packets.map { $0.header.continuityCounter } == [0x0D, 0x0D, 0x0D])
     #expect(packets.map { $0.header.pid } == [pid.value, pid.value, pid.value])

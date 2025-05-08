@@ -1,4 +1,4 @@
-struct TSProgramAssociationSection: Equatable, Sendable {
+struct TSProgramAssociationSection: TSTableSection {
   let tableHeader: TSTableHeader
   let byteRepresentation: ByteRepresentation
   var bytes: [UInt8] {
