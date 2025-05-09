@@ -203,7 +203,7 @@ struct TSMuxerTests {
     let sut = TSMuxer()
 
     await #expect(
-      throws: AVMediaCodersError.invalidTS(.dataStreamPIDMismatch)
+      throws: AVMediaCodersError.muxer(.dataStreamPIDMismatch)
     ) {
       try await sut.buildProgram(
         withNumberOfDataStreams: 2
@@ -223,7 +223,7 @@ struct TSMuxerTests {
     }
 
     await #expect(
-      throws: AVMediaCodersError.invalidTS(.dataStreamPIDMismatch)
+      throws: AVMediaCodersError.muxer(.dataStreamPIDMismatch)
     ) {
       try await sut.buildProgram(
         withNumberOfDataStreams: 0
@@ -248,7 +248,7 @@ struct TSMuxerTests {
     let sut = TSMuxer()
 
     await #expect(
-      throws: AVMediaCodersError.invalidTS(.dataStreamPIDMismatch)
+      throws: AVMediaCodersError.muxer(.dataStreamPIDMismatch)
     ) {
       try await sut.buildProgram(
         withNumberOfDataStreams: 2
@@ -304,7 +304,150 @@ struct TSMuxerTests {
     #expect(
       history[0] != history[1]
     )
-    print(sut)
+  }
+
+  @Test
+  func sendESData() async throws {
+    let delegate = await MuxerDelegate(callNumber: 3)
+    let sut = TSMuxer(outputDelegate: delegate)
+    try await sut.buildProgram(
+      withNumberOfDataStreams: 1
+    ) { streams in
+      TSProgramMapTable.Parameters(
+        PCRPID: streams[0],
+        programInfo: [0x42],
+        programElementInfos: [
+          .init(
+            streamType: .videoAVC,
+            elementaryPID: streams[0],
+            ESInfo: [0x42]
+          )
+        ]
+      )
+    }
+
+    try await sut.send(esData: [0x42], forPID: .dataStream(streamID: 1))
+    let history = try await delegate.completer.result()
+
+    #expect(history.count == 3)
+    #expect(
+      history[2] == [
+        TSPacket(
+          PID: .dataStream(streamID: 1),
+          continuityCounter: 0x0,
+          isStartOfPayload: true,
+          data: [0x42]
+        )
+      ]
+    )
+  }
+
+  @Test
+  func rejectDataSentThroughUnknownPID() async throws {
+    let delegate = await MuxerDelegate(callNumber: 2)
+    let sut = TSMuxer(outputDelegate: delegate)
+    try await sut.buildProgram(
+      withNumberOfDataStreams: 1
+    ) { streams in
+      TSProgramMapTable.Parameters(
+        PCRPID: streams[0],
+        programInfo: [0x42],
+        programElementInfos: [
+          .init(
+            streamType: .videoAVC,
+            elementaryPID: streams[0],
+            ESInfo: [0x42]
+          )
+        ]
+      )
+    }
+
+    await #expect(
+      throws: AVMediaCodersError.muxer(.dataStreamPIDMismatch)
+    ) {
+      try await sut.send(esData: [0x42], forPID: .dataStream(streamID: 2))
+    }
+  }
+
+  @Test
+  func rejectDataSentThroughTablePID() async throws {
+    let delegate = await MuxerDelegate(callNumber: 2)
+    let sut = TSMuxer(outputDelegate: delegate)
+    try await sut.buildProgram(
+      withNumberOfDataStreams: 1
+    ) { streams in
+      TSProgramMapTable.Parameters(
+        PCRPID: streams[0],
+        programInfo: [0x42],
+        programElementInfos: [
+          .init(
+            streamType: .videoAVC,
+            elementaryPID: streams[0],
+            ESInfo: [0x42]
+          )
+        ]
+      )
+    }
+
+    await #expect(
+      throws: AVMediaCodersError.muxer(.dataStreamPIDMismatch)
+    ) {
+      try await sut.send(esData: [0x42], forPID: .dataStream(streamID: 0))
+    }
+  }
+
+  @Test
+  func sendESDataThrough2Programs() async throws {
+    let delegate = await MuxerDelegate(callNumber: 7)
+    let sut = TSMuxer(outputDelegate: delegate)
+    try await sut.buildProgram(
+      withNumberOfDataStreams: 2
+    ) { streams in
+      TSProgramMapTable.Parameters(
+        PCRPID: streams[0],
+        programInfo: [0x01],
+        programElementInfos: [
+          TSProgramElementInfo(
+            streamType: .videoHEVC,
+            elementaryPID: streams[0],
+            ESInfo: []
+          ),
+          TSProgramElementInfo(
+            streamType: .audioADTSAAC,
+            elementaryPID: streams[1],
+            ESInfo: []
+          ),
+        ]
+      )
+    }
+    try await sut.buildProgram(
+      withNumberOfDataStreams: 2
+    ) { streams in
+      return TSProgramMapTable.Parameters(
+        PCRPID: streams[0],
+        programInfo: [0x02],
+        programElementInfos: [
+          TSProgramElementInfo(
+            streamType: .videoHEVC,
+            elementaryPID: streams[0],
+            ESInfo: []
+          ),
+          TSProgramElementInfo(
+            streamType: .audioADTSAAC,
+            elementaryPID: streams[1],
+            ESInfo: []
+          ),
+        ]
+      )
+    }
+
+    try await sut.send(esData: [0x42], forPID: .dataStream(streamID: 1))
+    try await sut.send(esData: [0x42], forPID: .dataStream(streamID: 2))
+    try await sut.send(esData: [0x42], forPID: .dataStream(streamID: 4))
+    try await sut.send(esData: [0x42], forPID: .dataStream(streamID: 5))
+
+    let history = try await delegate.completer.result()
+    #expect(history.count == 7)
   }
 }
 

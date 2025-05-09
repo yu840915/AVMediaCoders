@@ -9,6 +9,7 @@ enum AVMediaCodersError: Error, Equatable {
   case invalidHEVC(HEVCNALUnitError)
   case invalidPES(PESError)
   case invalidTS(TSError)
+  case muxer(MuxerError)
   case invalidISOTimestampPrefix
   case bufferTooShort
 }
@@ -45,5 +46,8 @@ enum TSError: Error, Equatable {
   case invalidCRC
   case invalidSectionNumber
   case inconsistentVersion
+}
+
+enum MuxerError: Error, Equatable {
   case dataStreamPIDMismatch
 }

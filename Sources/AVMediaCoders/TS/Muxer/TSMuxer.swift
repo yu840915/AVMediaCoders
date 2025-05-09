@@ -6,6 +6,7 @@ actor TSMuxer {
   private let PATPacketizer = TSDataPacketizer(pid: .programAssociationTable)
   private(set) var programAssociationTable: TSProgramAssociationTable
   private var programs: [UInt16: Program] = [:]
+  private var esPacketizers: [UInt16: TSDataPacketizer] = [:]
   var programTables: [UInt16: TSProgramMapTable] {
     programs.mapValues { $0.table }
   }
@@ -35,17 +36,22 @@ actor TSMuxer {
     }
     let params = builder(allocatedPIDs)
     guard params.programElementInfos.count == numberOfDataStreams else {
-      throw AVMediaCodersError.invalidTS(.dataStreamPIDMismatch)
+      throw AVMediaCodersError.muxer(.dataStreamPIDMismatch)
     }
     var usedPIDs = params.programElementInfos.map { $0.elementaryPID }
     for PID in allocatedPIDs {
       if let idx = usedPIDs.firstIndex(of: PID) {
         usedPIDs.remove(at: idx)
       } else {
-        throw AVMediaCodersError.invalidTS(.dataStreamPIDMismatch)
+        throw AVMediaCodersError.muxer(.dataStreamPIDMismatch)
       }
     }
     let tablePID = TSPID.dataStream(streamID: tableID)
+    for PID in allocatedPIDs {
+      if case let .dataStream(streamID) = PID {
+        esPacketizers[streamID] = TSDataPacketizer(pid: PID)
+      }
+    }
     programs[programNumber] = Program(
       table: TSProgramMapTable(
         programNumber: programNumber,
@@ -62,6 +68,24 @@ actor TSMuxer {
 
   func signalTable() {
     outputDelegate?.muxer(self, didOutputPackets: packetizePAT() + packetizePMTs())
+  }
+
+  func send(
+    adaptationFieldConfiguration: TSPacket.AdaptationFieldConfiguration? = nil,
+    esData: [UInt8],
+    forPID PID: TSPID
+  ) throws {
+    guard
+      case let .dataStream(streamID) = PID,
+      let packetizer = esPacketizers[streamID]
+    else {
+      throw AVMediaCodersError.muxer(.dataStreamPIDMismatch)
+    }
+    outputDelegate?.muxer(
+      self,
+      didOutputPackets: packetizer.packetize(
+        adaptationFieldConfiguration: adaptationFieldConfiguration, esData: esData)
+    )
   }
 }
 
