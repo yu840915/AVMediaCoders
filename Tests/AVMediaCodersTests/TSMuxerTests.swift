@@ -451,7 +451,7 @@ struct TSMuxerTests {
   }
 }
 
-class MuxerDelegate: TSMuxerOutputDelegate, @unchecked Sendable {
+private class MuxerDelegate: TSMuxerOutputDelegate, @unchecked Sendable {
   var history: [[TSPacket]] = []
   let completer: TimeoutThrowingCompleter<[[TSPacket]]>
   let callNumber: Int

@@ -131,3 +131,26 @@ extension TSPacket {
         }
     }
 }
+
+extension TSPacket: CustomDebugStringConvertible {
+    var debugDescription: String {
+        """
+        TSPacket(
+            header: \(header),
+            payload: \(payload.debugDescription),
+        )
+        """
+    }
+}
+extension TSPacket.Payload: CustomDebugStringConvertible {
+    var debugDescription: String {
+        switch self {
+        case .adaptationField(let field):
+            return "AdaptationField: \(field)"
+        case .dataPayload(let data):
+            return "DataPayload(\(data.count))"
+        case .both(let field, let data):
+            return "AdaptationField: \(field), DataPayload(\(data.count))"
+        }
+    }
+}

@@ -1,4 +1,4 @@
-enum TSPID: Equatable {
+enum TSPID: Equatable, Hashable {
   case programAssociationTable
   case conditionalAccesssTable
   case transportStreamDescriptionTable
@@ -36,6 +36,24 @@ enum TSPID: Equatable {
     default:
       throw AVMediaCodersError.invalidTS(.unexpectedPID)
     }
+  }
 
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+  }
+}
+
+extension TSPID: CustomStringConvertible {
+  var description: String {
+    switch self {
+    case .programAssociationTable: return "PAT"
+    case .conditionalAccesssTable: return "CAT"
+    case .transportStreamDescriptionTable: return "TSDT"
+    case .controlInformationTable: return "CIT"
+    case .reserved: return "Reserved"
+    case .dvbMetaData(let type): return "DVB-MetaData(\(type))"
+    case .dataStream(let streamID): return "DataStream(\(streamID))"
+    case .nullPacket: return "NullPacket"
+    }
   }
 }

@@ -142,6 +142,12 @@ extension TSAdaptationField {
   }
 }
 
+extension TSAdaptationField: CustomDebugStringConvertible {
+  var debugDescription: String {
+    "TSAdaptationField(length: \(length))"
+  }
+}
+
 struct AdaptationFieldExtension: Equatable, Sendable {
   let length: UInt8
   let legalTimeWindowFlag: Bool
@@ -159,6 +165,5 @@ extension AdaptationFieldExtension {
     let legalTimeWindowFlag: Bool
     let piecewiseRateFlag: Bool
     let seamlessSpliceFlag: Bool
-
   }
 }

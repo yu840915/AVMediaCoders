@@ -13,6 +13,9 @@ struct TSProgramAssociationSection: TSTableSection {
   var lastSectionNumber: UInt8 {
     byteRepresentation.lastSectionNumber
   }
+  var isLastSection: Bool {
+    sectionNumber == lastSectionNumber
+  }
 
   let programMapPIDs: [TSPIDEntry]
   let crc: UInt32
