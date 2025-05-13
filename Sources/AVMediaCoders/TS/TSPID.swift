@@ -1,4 +1,4 @@
-enum TSPID: Equatable, Hashable {
+public enum TSPID: Equatable, Hashable, Sendable {
   case programAssociationTable
   case conditionalAccesssTable
   case transportStreamDescriptionTable
@@ -38,13 +38,13 @@ enum TSPID: Equatable, Hashable {
     }
   }
 
-  func hash(into hasher: inout Hasher) {
+  public func hash(into hasher: inout Hasher) {
     hasher.combine(value)
   }
 }
 
 extension TSPID: CustomStringConvertible {
-  var description: String {
+  public var description: String {
     switch self {
     case .programAssociationTable: return "PAT"
     case .conditionalAccesssTable: return "CAT"

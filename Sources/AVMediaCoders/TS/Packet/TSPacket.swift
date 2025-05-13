@@ -1,4 +1,4 @@
-struct TSPacket: Equatable, Sendable {
+public struct TSPacket: Equatable, Sendable {
     let packetSize = 188
     let headerSize = 4
     let payloadSize = 184
@@ -38,7 +38,7 @@ struct TSPacket: Equatable, Sendable {
         )
     }
 
-    init(bytes: [UInt8]) throws {
+    public init(bytes: [UInt8]) throws {
         guard bytes.count >= packetSize else {
             throw AVMediaCodersError.bufferTooShort
         }
@@ -115,12 +115,12 @@ extension TSPacket {
         }
     }
 
-    struct AdaptationFieldConfiguration: Equatable, Sendable {
-        let pcr: TSClockReference?
-        let opcr: TSClockReference?
-        let allowRandomAccess: Bool
+    public struct AdaptationFieldConfiguration: Equatable, Sendable {
+        public let pcr: TSClockReference?
+        public let opcr: TSClockReference?
+        public let allowRandomAccess: Bool
 
-        init(
+        public init(
             pcr: TSClockReference? = nil,
             opcr: TSClockReference? = nil,
             allowRandomAccess: Bool = false
@@ -133,7 +133,7 @@ extension TSPacket {
 }
 
 extension TSPacket: CustomDebugStringConvertible {
-    var debugDescription: String {
+    public var debugDescription: String {
         """
         TSPacket(
             header: \(header),

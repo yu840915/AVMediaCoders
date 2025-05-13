@@ -1,6 +1,6 @@
-struct TSProgramAssociationTable: Equatable, Sendable {
-  private(set) var versionNumber: UInt8
-  private(set) var programs: [UInt16: TSPID]
+public struct TSProgramAssociationTable: Equatable, Sendable {
+  public private(set) var versionNumber: UInt8
+  public private(set) var programs: [UInt16: TSPID]
 
   init(
     versionNumber: UInt8 = 0,

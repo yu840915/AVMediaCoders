@@ -1,6 +1,6 @@
 private let logger = Loggers.demuxing.build()
 
-protocol TSDemuxerOutputDelegate: AnyObject, Sendable {
+public protocol TSDemuxerOutputDelegate: AnyObject, Sendable {
   func demuxer(
     _ demuxer: TSDemuxer,
     didUpdateProgramAssociationTable table: TSProgramAssociationTable
@@ -19,7 +19,7 @@ protocol TSDemuxerOutputDelegate: AnyObject, Sendable {
   )
 }
 
-actor TSDemuxer {
+public actor TSDemuxer {
   private let PATDepackitizer = TSDataDepacketizer(pid: .programAssociationTable)
   private var currentDepacketizer: TSDataDepacketizer?
   private(set) var programAssociationTable: TSProgramAssociationTable = .init()
@@ -28,17 +28,17 @@ actor TSDemuxer {
   private var depacketizers: [TSPID: TSDataDepacketizer] = [:]
   private var programTables: [TSPID: TSProgramMapTable] = [:]
 
-  init(outputDelegate: TSDemuxerOutputDelegate? = nil) {
+  public init(outputDelegate: TSDemuxerOutputDelegate? = nil) {
     self.outputDelegate = outputDelegate
   }
 
-  func feed(_ packets: [TSPacket]) {
+  public func feed(_ packets: [TSPacket]) {
     for packet in packets {
       feed(packet)
     }
   }
 
-  func feed(_ packet: TSPacket) {
+  public func feed(_ packet: TSPacket) {
     if let currentPID = currentDepacketizer?.PID,
       currentPID != packet.header.PID
     {
@@ -54,7 +54,7 @@ actor TSDemuxer {
     }
   }
 
-  func flush() {
+  public func flush() {
     guard let depacketizer = currentDepacketizer else {
       return
     }

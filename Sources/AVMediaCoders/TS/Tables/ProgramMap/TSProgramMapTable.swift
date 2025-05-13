@@ -1,9 +1,9 @@
-struct TSProgramMapTable: Equatable, Sendable {
-  let programNumber: UInt16
-  private(set) var versionNumber: UInt8
-  private(set) var PCRPID: TSPID
-  private(set) var programInfo: [UInt8]
-  private(set) var programElementInfos: [TSProgramElementInfo]
+public struct TSProgramMapTable: Equatable, Sendable {
+  public let programNumber: UInt16
+  public private(set) var versionNumber: UInt8
+  public private(set) var PCRPID: TSPID
+  public private(set) var programInfo: [UInt8]
+  public private(set) var programElementInfos: [TSProgramElementInfo]
 
   init(
     programNumber: UInt16,
@@ -89,7 +89,7 @@ struct TSProgramMapTable: Equatable, Sendable {
 }
 
 extension TSProgramMapTable {
-  struct Parameters: Equatable, Sendable {
+  public struct Parameters: Equatable, Sendable {
     var PCRPID: TSPID
     var programInfo: [UInt8]
     var programElementInfos: [TSProgramElementInfo]

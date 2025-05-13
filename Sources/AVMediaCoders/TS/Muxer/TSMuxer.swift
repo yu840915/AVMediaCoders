@@ -6,23 +6,23 @@ public protocol TSMuxerOutputDelegate: AnyObject, Sendable {
 
 public actor TSMuxer {
   private let PATPacketizer = TSDataPacketizer(pid: .programAssociationTable)
-  private(set) var programAssociationTable: TSProgramAssociationTable
+  public private(set) var programAssociationTable: TSProgramAssociationTable
   private var programs: [UInt16: Program] = [:]
   private var esPacketizers: [UInt16: TSDataPacketizer] = [:]
-  var programTables: [UInt16: TSProgramMapTable] {
+  public var programTables: [UInt16: TSProgramMapTable] {
     programs.mapValues { $0.table }
   }
 
   private var nextAvailableStreamID: UInt16 = 0
   private weak var outputDelegate: TSMuxerOutputDelegate?
 
-  init(outputDelegate: TSMuxerOutputDelegate? = nil, trace: Int = 0) async {
+  public init(outputDelegate: TSMuxerOutputDelegate? = nil) async {
     programAssociationTable = TSProgramAssociationTable()
     self.outputDelegate = outputDelegate
     signalTable()
   }
 
-  func buildProgram(
+  public func buildProgram(
     withNumberOfDataStreams numberOfDataStreams: UInt16,
     builder: ([TSPID]) -> TSProgramMapTable.Parameters
   ) throws {
@@ -71,7 +71,7 @@ public actor TSMuxer {
     signalTable()
   }
 
-  func signalTable() {
+  public func signalTable() {
     logger.trace("Signaling tables")
     outputDelegate?.muxer(
       self,
@@ -79,7 +79,7 @@ public actor TSMuxer {
     )
   }
 
-  func send(
+  public func send(
     adaptationFieldConfiguration: TSPacket.AdaptationFieldConfiguration? = nil,
     esData: [UInt8],
     forPID PID: TSPID

@@ -1,13 +1,13 @@
 import CoreMedia
 
-struct TSClockReference: Equatable {
+public struct TSClockReference: Equatable, Sendable {
   let value: UInt64
   let valueScale = 90000
 
   let ext: UInt16
   let extScale = 27_000_000
 
-  init(
+  public init(
     _ value: UInt64,
     ext: UInt16 = 0
   ) {

@@ -1,8 +1,8 @@
-struct TSProgramElementInfo: Equatable, Sendable {
-  let streamType: TSStreamType
-  let elementaryPID: TSPID
+public struct TSProgramElementInfo: Equatable, Sendable {
+  public let streamType: TSStreamType
+  public let elementaryPID: TSPID
   let byteRepresentation: ByteRepresentation
-  var ESInfo: [UInt8] {
+  public var ESInfo: [UInt8] {
     byteRepresentation.ESInfo
   }
   var bytes: [UInt8] {
@@ -75,7 +75,7 @@ extension TSProgramElementInfo {
   }
 }
 
-enum TSStreamType: Equatable {
+public enum TSStreamType: Equatable, Sendable {
   case videoMPEG1
   case videoMPEG2
   case audioMPEG1

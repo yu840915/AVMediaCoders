@@ -309,7 +309,7 @@ struct TSMuxerTests {
   @Test
   func sendESData() async throws {
     let delegate = await MuxerDelegate(callNumber: 3)
-    let sut = await TSMuxer(outputDelegate: delegate, trace: 42)
+    let sut = await TSMuxer(outputDelegate: delegate)
     try await sut.buildProgram(
       withNumberOfDataStreams: 1
     ) { streams in
@@ -399,7 +399,7 @@ struct TSMuxerTests {
   @Test
   func sendESDataThrough2Programs() async throws {
     let delegate = await MuxerDelegate(callNumber: 7)
-    let sut = await TSMuxer(outputDelegate: delegate, trace: 33)
+    let sut = await TSMuxer(outputDelegate: delegate)
     try await sut.buildProgram(
       withNumberOfDataStreams: 2
     ) { streams in

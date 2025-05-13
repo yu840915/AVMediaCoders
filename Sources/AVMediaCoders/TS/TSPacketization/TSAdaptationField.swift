@@ -1,4 +1,4 @@
-struct TSAdaptationField: Equatable, Sendable {
+public struct TSAdaptationField: Equatable, Sendable {
   static let minimumLength: UInt8 = 2
   static let maximumLength: UInt8 = 184
   let length: UInt8
@@ -143,7 +143,7 @@ extension TSAdaptationField {
 }
 
 extension TSAdaptationField: CustomDebugStringConvertible {
-  var debugDescription: String {
+  public var debugDescription: String {
     "TSAdaptationField(length: \(length))"
   }
 }
