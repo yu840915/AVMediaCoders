@@ -1,8 +1,10 @@
-protocol TSMuxerOutputDelegate: AnyObject, Sendable {
+private let logger = Loggers.muxing.build()
+
+public protocol TSMuxerOutputDelegate: AnyObject, Sendable {
   func muxer(_ muxer: TSMuxer, didOutputPackets packets: [TSPacket])
 }
 
-actor TSMuxer {
+public actor TSMuxer {
   private let PATPacketizer = TSDataPacketizer(pid: .programAssociationTable)
   private(set) var programAssociationTable: TSProgramAssociationTable
   private var programs: [UInt16: Program] = [:]
@@ -10,15 +12,14 @@ actor TSMuxer {
   var programTables: [UInt16: TSProgramMapTable] {
     programs.mapValues { $0.table }
   }
+
   private var nextAvailableStreamID: UInt16 = 0
   private weak var outputDelegate: TSMuxerOutputDelegate?
 
-  init(outputDelegate: TSMuxerOutputDelegate? = nil) {
+  init(outputDelegate: TSMuxerOutputDelegate? = nil, trace: Int = 0) async {
     programAssociationTable = TSProgramAssociationTable()
     self.outputDelegate = outputDelegate
-    Task {
-      await signalTable()
-    }
+    signalTable()
   }
 
   func buildProgram(
@@ -52,22 +53,30 @@ actor TSMuxer {
         esPacketizers[streamID] = TSDataPacketizer(pid: PID)
       }
     }
-    programs[programNumber] = Program(
+    let program = Program(
       table: TSProgramMapTable(
         programNumber: programNumber,
         parameters: params
       ),
       packetizer: TSDataPacketizer(pid: tablePID)
     )
+    programs[programNumber] = program
     programAssociationTable.update {
       $0.programs[programNumber] = tablePID
     }
     nextAvailableStreamID = numberOfDataStreams + 1
+    logger.info(
+      "Program \(programNumber) created with PID \(tablePID)"
+    )
     signalTable()
   }
 
   func signalTable() {
-    outputDelegate?.muxer(self, didOutputPackets: packetizePAT() + packetizePMTs())
+    logger.trace("Signaling tables")
+    outputDelegate?.muxer(
+      self,
+      didOutputPackets: packetizePAT() + packetizePMTs()
+    )
   }
 
   func send(
@@ -81,10 +90,13 @@ actor TSMuxer {
     else {
       throw AVMediaCodersError.muxer(.dataStreamPIDMismatch)
     }
+    logger.trace("Sending data for PID \(PID)")
     outputDelegate?.muxer(
       self,
       didOutputPackets: packetizer.packetize(
-        adaptationFieldConfiguration: adaptationFieldConfiguration, esData: esData)
+        adaptationFieldConfiguration: adaptationFieldConfiguration,
+        esData: esData
+      )
     )
   }
 }

@@ -1,11 +1,11 @@
 private let logger = Loggers.tsDepacketizing.build()
 
 class TSDataDepacketizer {
-  let pid: TSPID
+  let PID: TSPID
   private(set) var stashedPackets: [TSPacket] = []
 
   init(pid: TSPID) {
-    self.pid = pid
+    self.PID = pid
   }
 
   func feed(_ packets: [TSPacket]) -> [Output] {
@@ -13,7 +13,7 @@ class TSDataDepacketizer {
   }
 
   func feed(_ packet: TSPacket) -> Output? {
-    guard packet.header.pid == pid.value else {
+    guard packet.header.pid == PID.value else {
       return nil
     }
     if packet.header.isStartOfPayload {

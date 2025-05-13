@@ -43,6 +43,7 @@ struct TSProgramMapTableTests {
     var sut = TSProgramMapTable(programNumber: 1)
 
     sut.update {
+      $0.PCRPID = .dataStream(streamID: 0x01)
       $0.programElementInfos.append(
         TSProgramElementInfo(
           streamType: .videoHEVC,

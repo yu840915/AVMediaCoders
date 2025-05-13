@@ -39,7 +39,7 @@ actor TSDemuxer {
   }
 
   func feed(_ packet: TSPacket) {
-    if let currentPID = currentDepacketizer?.pid,
+    if let currentPID = currentDepacketizer?.PID,
       currentPID != packet.header.PID
     {
       flush()
@@ -50,7 +50,7 @@ actor TSDemuxer {
     }
     currentDepacketizer = depacketizer
     if let output = depacketizer.feed(packet) {
-      handleOutput(output, forPID: depacketizer.pid)
+      handleOutput(output, forPID: depacketizer.PID)
     }
   }
 
@@ -59,10 +59,10 @@ actor TSDemuxer {
       return
     }
     guard let output = depacketizer.flush() else {
-      logger.debug("No output from depacketizer, PID \(packet.header.PID)")
+      logger.debug("No output from depacketizer, PID \(depacketizer.PID)")
       return
     }
-    handleOutput(output, forPID: depacketizer.pid)
+    handleOutput(output, forPID: depacketizer.PID)
   }
 }
 
@@ -97,6 +97,7 @@ extension TSDemuxer {
       let section = try TSProgramAssociationSection(bytes: output.esData)
       PATSections.append(section)
       if !section.isLastSection {
+        logger.debug("Appending PAT section")
         return
       }
       let sections = PATSections
@@ -105,12 +106,12 @@ extension TSDemuxer {
       if programAssociationTable == table {
         return
       }
+      logger.debug("Update PAT")
       programAssociationTable = table
       preparePMTDepacketizer()
       outputDelegate?.demuxer(self, didUpdateProgramAssociationTable: table)
     } catch {
       logger.warning("Failed to parse PAT, error: \(error)")
-      return
     }
   }
 
@@ -118,6 +119,7 @@ extension TSDemuxer {
     for program in programAssociationTable.programs {
       let PID = program.value
       if depacketizers[PID] == nil {
+        logger.debug("Prepare depacketizer for PMT(\(program.key)) over \(PID)")
         depacketizers[PID] = TSDataDepacketizer(pid: PID)
         programTables[PID] = TSProgramMapTable(programNumber: program.key)
       }
@@ -131,6 +133,7 @@ extension TSDemuxer {
       if programTables[PID] == table {
         return
       }
+      logger.debug("Update PMT over \(PID)")
       programTables[PID] = table
       prepareProgramDepacketizer(from: table)
       outputDelegate?.demuxer(self, didUpdateProgramMapTable: table)
@@ -142,6 +145,9 @@ extension TSDemuxer {
   func prepareProgramDepacketizer(from table: TSProgramMapTable) {
     for stream in table.programElementInfos {
       if depacketizers[stream.elementaryPID] == nil {
+        logger.debug(
+          "Prepare depacketizer for ES of program(\(table.programNumber)) over \(stream.elementaryPID)"
+        )
         depacketizers[stream.elementaryPID] = TSDataDepacketizer(pid: stream.elementaryPID)
       }
     }

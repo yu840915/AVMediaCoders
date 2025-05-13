@@ -6,7 +6,7 @@ import Testing
 struct TSMuxerTests {
   @Test
   func initState() async throws {
-    let sut = TSMuxer()
+    let sut = await TSMuxer()
 
     #expect(await sut.programAssociationTable == TSProgramAssociationTable())
     #expect(await sut.programTables.isEmpty)
@@ -14,7 +14,7 @@ struct TSMuxerTests {
 
   @Test
   func buildFirstProgram() async throws {
-    let sut = TSMuxer()
+    let sut = await TSMuxer()
 
     try await sut.buildProgram(
       withNumberOfDataStreams: 2
@@ -70,11 +70,11 @@ struct TSMuxerTests {
 
   @Test
   func buildEmptyProgram() async throws {
-    let sut = TSMuxer()
+    let sut = await TSMuxer()
 
     try await sut.buildProgram(
       withNumberOfDataStreams: 0
-    ) { streams in
+    ) { _ in
       TSProgramMapTable.Parameters(
         PCRPID: .nullPacket,
         programInfo: [0x42],
@@ -104,7 +104,7 @@ struct TSMuxerTests {
 
   @Test
   func build2Programs() async throws {
-    let sut = TSMuxer()
+    let sut = await TSMuxer()
 
     try await sut.buildProgram(
       withNumberOfDataStreams: 2
@@ -129,7 +129,7 @@ struct TSMuxerTests {
     try await sut.buildProgram(
       withNumberOfDataStreams: 2
     ) { streams in
-      return TSProgramMapTable.Parameters(
+      TSProgramMapTable.Parameters(
         PCRPID: streams[0],
         programInfo: [0x02],
         programElementInfos: [
@@ -200,7 +200,7 @@ struct TSMuxerTests {
 
   @Test
   func numberOfStreamsMustMatch() async throws {
-    let sut = TSMuxer()
+    let sut = await TSMuxer()
 
     await #expect(
       throws: AVMediaCodersError.muxer(.dataStreamPIDMismatch)
@@ -227,7 +227,7 @@ struct TSMuxerTests {
     ) {
       try await sut.buildProgram(
         withNumberOfDataStreams: 0
-      ) { streams in
+      ) { _ in
         TSProgramMapTable.Parameters(
           PCRPID: .dataStream(streamID: 1),
           programInfo: [0x42],
@@ -245,7 +245,7 @@ struct TSMuxerTests {
 
   @Test
   func onlyAllowsPIDsProvidedInBuilder() async throws {
-    let sut = TSMuxer()
+    let sut = await TSMuxer()
 
     await #expect(
       throws: AVMediaCodersError.muxer(.dataStreamPIDMismatch)
@@ -277,7 +277,7 @@ struct TSMuxerTests {
   func signalInitialTableOnInitialization() async throws {
     let delegate = await MuxerDelegate(callNumber: 1)
 
-    let sut = TSMuxer(outputDelegate: delegate)
+    let sut = await TSMuxer(outputDelegate: delegate)
     let history = try await delegate.completer.result()
 
     #expect(history.count == 1)
@@ -287,11 +287,11 @@ struct TSMuxerTests {
   @Test
   func signalTableChange() async throws {
     let delegate = await MuxerDelegate(callNumber: 2)
-    let sut = TSMuxer(outputDelegate: delegate)
+    let sut = await TSMuxer(outputDelegate: delegate)
 
     try await sut.buildProgram(
       withNumberOfDataStreams: 0
-    ) { streams in
+    ) { _ in
       TSProgramMapTable.Parameters(
         PCRPID: .nullPacket,
         programInfo: [0x42],
@@ -309,7 +309,7 @@ struct TSMuxerTests {
   @Test
   func sendESData() async throws {
     let delegate = await MuxerDelegate(callNumber: 3)
-    let sut = TSMuxer(outputDelegate: delegate)
+    let sut = await TSMuxer(outputDelegate: delegate, trace: 42)
     try await sut.buildProgram(
       withNumberOfDataStreams: 1
     ) { streams in
@@ -345,7 +345,7 @@ struct TSMuxerTests {
   @Test
   func rejectDataSentThroughUnknownPID() async throws {
     let delegate = await MuxerDelegate(callNumber: 2)
-    let sut = TSMuxer(outputDelegate: delegate)
+    let sut = await TSMuxer(outputDelegate: delegate)
     try await sut.buildProgram(
       withNumberOfDataStreams: 1
     ) { streams in
@@ -372,7 +372,7 @@ struct TSMuxerTests {
   @Test
   func rejectDataSentThroughTablePID() async throws {
     let delegate = await MuxerDelegate(callNumber: 2)
-    let sut = TSMuxer(outputDelegate: delegate)
+    let sut = await TSMuxer(outputDelegate: delegate)
     try await sut.buildProgram(
       withNumberOfDataStreams: 1
     ) { streams in
@@ -399,7 +399,7 @@ struct TSMuxerTests {
   @Test
   func sendESDataThrough2Programs() async throws {
     let delegate = await MuxerDelegate(callNumber: 7)
-    let sut = TSMuxer(outputDelegate: delegate)
+    let sut = await TSMuxer(outputDelegate: delegate, trace: 33)
     try await sut.buildProgram(
       withNumberOfDataStreams: 2
     ) { streams in
@@ -423,7 +423,7 @@ struct TSMuxerTests {
     try await sut.buildProgram(
       withNumberOfDataStreams: 2
     ) { streams in
-      return TSProgramMapTable.Parameters(
+      TSProgramMapTable.Parameters(
         PCRPID: streams[0],
         programInfo: [0x02],
         programElementInfos: [
@@ -451,22 +451,35 @@ struct TSMuxerTests {
   }
 }
 
-private class MuxerDelegate: TSMuxerOutputDelegate, @unchecked Sendable {
-  var history: [[TSPacket]] = []
+class MuxerDelegate: TSMuxerOutputDelegate, @unchecked Sendable {
+  let recorder = Recorder()
   let completer: TimeoutThrowingCompleter<[[TSPacket]]>
   let callNumber: Int
 
   init(callNumber: Int) async {
-    self.completer = await TimeoutThrowingCompleter<[[TSPacket]]>(waitFor: .seconds(1))
+    completer = await TimeoutThrowingCompleter<[[TSPacket]]>(waitFor: .seconds(1))
     self.callNumber = callNumber
   }
 
   func muxer(_ muxer: TSMuxer, didOutputPackets packets: [TSPacket]) {
-    history.append(packets)
-    if history.count == callNumber {
-      Task {
-        await completer.resume(history)
-      }
+    Task {
+      await append(packets)
     }
+  }
+
+  func append(_ packets: [TSPacket]) async {
+    let history = await recorder.append(packets)
+    if history.count == callNumber {
+      await completer.resume(history)
+    }
+  }
+}
+
+actor Recorder {
+  private(set) var history: [[TSPacket]] = []
+
+  func append(_ entry: [TSPacket]) -> [[TSPacket]] {
+    history.append(entry)
+    return history
   }
 }

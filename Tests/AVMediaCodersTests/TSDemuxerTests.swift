@@ -13,11 +13,8 @@ struct TSDemuxerTests {
 
   @Test
   func demuxTables() async throws {
-    let delegate = await DemuxerDelegate(callNumber: 2)
-    let sut = TSDemuxer(outputDelegate: delegate)
-    let joint = Joint(demuxer: sut)
-    let muxer = TSMuxer(outputDelegate: joint)
-
+    let muxerDelegate = await MuxerDelegate(callNumber: 2)
+    let muxer = await TSMuxer(outputDelegate: muxerDelegate)
     try await muxer.buildProgram(
       withNumberOfDataStreams: 2
     ) { pids in
@@ -38,7 +35,11 @@ struct TSDemuxerTests {
         ]
       )
     }
+    let packets = (try await muxerDelegate.completer.result()).flatMap { $0 }
+    let delegate = await DemuxerDelegate(callNumber: 2)
+    let sut = TSDemuxer(outputDelegate: delegate)
 
+    await sut.feed(packets)
     await sut.flush()
     try await delegate.completer.result()
 
@@ -76,52 +77,53 @@ struct TSDemuxerTests {
 
   @Test
   func demux2ProgramTables() async throws {
+    let muxerDelegate = await MuxerDelegate(callNumber: 3)
+    let muxer = await TSMuxer(outputDelegate: muxerDelegate)
+    try await muxer.buildProgram(
+      withNumberOfDataStreams: 2
+    ) { pids in
+      .init(
+        PCRPID: pids[0],
+        programInfo: [],
+        programElementInfos: [
+          TSProgramElementInfo(
+            streamType: .videoAVC,
+            elementaryPID: pids[0],
+            ESInfo: []
+          ),
+          TSProgramElementInfo(
+            streamType: .audioADTSAAC,
+            elementaryPID: pids[1],
+            ESInfo: []
+          ),
+        ]
+      )
+    }
+    try await muxer.buildProgram(
+      withNumberOfDataStreams: 2
+    ) { pids in
+      .init(
+        PCRPID: pids[0],
+        programInfo: [],
+        programElementInfos: [
+          TSProgramElementInfo(
+            streamType: .videoAVC,
+            elementaryPID: pids[0],
+            ESInfo: []
+          ),
+          TSProgramElementInfo(
+            streamType: .audioADTSAAC,
+            elementaryPID: pids[1],
+            ESInfo: []
+          ),
+        ]
+      )
+    }
+    let packets = (try await muxerDelegate.completer.result()).flatMap { $0 }
     let delegate = await DemuxerDelegate(callNumber: 4)
     let sut = TSDemuxer(outputDelegate: delegate)
-    let joint = Joint(demuxer: sut)
-    let muxer = TSMuxer(outputDelegate: joint)
 
-    try await muxer.buildProgram(
-      withNumberOfDataStreams: 2
-    ) { pids in
-      .init(
-        PCRPID: pids[0],
-        programInfo: [],
-        programElementInfos: [
-          TSProgramElementInfo(
-            streamType: .videoAVC,
-            elementaryPID: pids[0],
-            ESInfo: []
-          ),
-          TSProgramElementInfo(
-            streamType: .audioADTSAAC,
-            elementaryPID: pids[1],
-            ESInfo: []
-          ),
-        ]
-      )
-    }
-    try await muxer.buildProgram(
-      withNumberOfDataStreams: 2
-    ) { pids in
-      .init(
-        PCRPID: pids[0],
-        programInfo: [],
-        programElementInfos: [
-          TSProgramElementInfo(
-            streamType: .videoAVC,
-            elementaryPID: pids[0],
-            ESInfo: []
-          ),
-          TSProgramElementInfo(
-            streamType: .audioADTSAAC,
-            elementaryPID: pids[1],
-            ESInfo: []
-          ),
-        ]
-      )
-    }
-
+    await sut.feed(packets)
     await sut.flush()
     try await delegate.completer.result()
 
@@ -140,11 +142,8 @@ struct TSDemuxerTests {
 
   @Test
   func demuxESStream() async throws {
-    let delegate = await DemuxerDelegate(callNumber: 6)
-    let sut = TSDemuxer(outputDelegate: delegate)
-    let joint = Joint(demuxer: sut)
-    let muxer = TSMuxer(outputDelegate: joint)
-
+    let muxerDelegate = await MuxerDelegate(callNumber: 6)
+    let muxer = await TSMuxer(outputDelegate: muxerDelegate)
     try await muxer.buildProgram(
       withNumberOfDataStreams: 2
     ) { pids in
@@ -185,28 +184,17 @@ struct TSDemuxerTests {
         ]
       )
     }
-
     try await muxer.send(esData: [0x01], forPID: .dataStream(streamID: 2))
     try await muxer.send(esData: [0x02], forPID: .dataStream(streamID: 4))
     try await muxer.send(esData: [0x03], forPID: .dataStream(streamID: 5))
+    let packets = (try await muxerDelegate.completer.result()).flatMap { $0 }
+    let delegate = await DemuxerDelegate(callNumber: 6)
+    let sut = TSDemuxer(outputDelegate: delegate)
 
+    await sut.feed(packets)
     try await delegate.completer.result()
     #expect(delegate.esData[2] == [0x01])
     #expect(delegate.esData[4] == [0x02])
-  }
-}
-
-private class Joint: TSMuxerOutputDelegate, @unchecked Sendable {
-  let demuxer: TSDemuxer
-
-  init(demuxer: TSDemuxer) {
-    self.demuxer = demuxer
-  }
-
-  func muxer(_ muxer: AVMediaCoders.TSMuxer, didOutputPackets packets: [AVMediaCoders.TSPacket]) {
-    Task {
-      await demuxer.feed(packets)
-    }
   }
 }
 
@@ -222,10 +210,11 @@ private class DemuxerDelegate: TSDemuxerOutputDelegate, @unchecked Sendable {
       }
     }
   }
+
   let completer: TimeoutThrowingCompleter<Void>
   init(callNumber: Int) async {
-    self.completer = await TimeoutThrowingCompleter(waitFor: .seconds(1))
-    self.expCallNumber = callNumber
+    completer = await TimeoutThrowingCompleter(waitFor: .seconds(1))
+    expCallNumber = callNumber
   }
 
   func markAsCompleted() {
