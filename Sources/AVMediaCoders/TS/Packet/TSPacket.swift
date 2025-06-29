@@ -132,18 +132,18 @@ extension TSPacket {
     }
 }
 
-extension TSPacket: CustomDebugStringConvertible {
-    public var debugDescription: String {
+extension TSPacket: CustomStringConvertible {
+  public var description: String {
         """
         TSPacket(
             header: \(header),
-            payload: \(payload.debugDescription),
+            payload: \(payload),
         )
         """
     }
 }
-extension TSPacket.Payload: CustomDebugStringConvertible {
-    var debugDescription: String {
+extension TSPacket.Payload: CustomStringConvertible {
+  public var description: String {
         switch self {
         case .adaptationField(let field):
             return "AdaptationField: \(field)"

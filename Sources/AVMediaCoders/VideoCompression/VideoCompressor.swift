@@ -156,7 +156,7 @@ extension VideoCompressor {
     )
     VTCompressionSessionPrepareToEncodeFrames(session)
     try configuration.properties.forEach { key, value in
-      logger.trace("Setting \(key) to \(value.debugDescription)")
+      logger.trace("Setting \(key) to \(value.description)")
       try ensureSuccess(
         osStatus:
         VTSessionSetProperty(session, key: key, value: value)

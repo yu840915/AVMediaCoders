@@ -142,8 +142,8 @@ extension TSAdaptationField {
   }
 }
 
-extension TSAdaptationField: CustomDebugStringConvertible {
-  public var debugDescription: String {
+extension TSAdaptationField: CustomStringConvertible {
+  public var description: String {
     "TSAdaptationField(length: \(length))"
   }
 }
