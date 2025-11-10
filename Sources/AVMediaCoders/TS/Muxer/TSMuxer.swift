@@ -95,7 +95,7 @@ public actor TSMuxer {
       self,
       didOutputPackets: packetizer.packetize(
         adaptationFieldConfiguration: adaptationFieldConfiguration,
-        esData: esData
+        esData: esData,
       )
     )
   }

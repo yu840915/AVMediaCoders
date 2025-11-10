@@ -3,56 +3,27 @@ import VideoToolbox
 
 private let logger = Loggers.compressing.build()
 
-public enum VideoCodec: Sendable {
-  case avc
-  case hevc
-}
-
-extension VideoCompressor {
-  public struct Configuration: Sendable {
-    public var width: Int
-    public var height: Int
-    public var codec: VideoCodec
-    public var bitrate: Int
-    public var frameRate: Int
-    public var maxKeyFrameInterval: Int
-    var properties: [CFString: CFTypeRef] {
-      [
-        kVTCompressionPropertyKey_RealTime: kCFBooleanTrue,
-        kVTCompressionPropertyKey_AllowFrameReordering: kCFBooleanFalse,
-        kVTCompressionPropertyKey_ExpectedFrameRate: frameRate as CFNumber,
-        kVTCompressionPropertyKey_AverageBitRate: bitrate as CFNumber,
-        kVTCompressionPropertyKey_MaxKeyFrameInterval: maxKeyFrameInterval as CFNumber,
-      ]
-    }
-
-    public init(
-      width: Int,
-      height: Int,
-      codec: VideoCodec,
-      bitrate: Int,
-      frameRate: Int,
-      maxKeyFrameInterval: Int
-    ) {
-      self.width = width
-      self.height = height
-      self.codec = codec
-      self.bitrate = bitrate
-      self.frameRate = frameRate
-      self.maxKeyFrameInterval = maxKeyFrameInterval
-    }
+extension VideoCompressionConfiguration {
+  var properties: [CFString: CFTypeRef] {
+    [
+      kVTCompressionPropertyKey_RealTime: kCFBooleanTrue,
+      kVTCompressionPropertyKey_AllowFrameReordering: kCFBooleanFalse,
+      kVTCompressionPropertyKey_ExpectedFrameRate: frameRate as CFNumber,
+      kVTCompressionPropertyKey_AverageBitRate: bitrate as CFNumber,
+      kVTCompressionPropertyKey_MaxKeyFrameInterval: maxKeyFrameInterval as CFNumber,
+    ]
   }
 }
 
 public final class VideoCompressor {
-  let configuration: Configuration
+  let configuration: VideoCompressionConfiguration
   fileprivate(set) var compressionSession: VTCompressionSession!
   fileprivate let compressedBuffer$ = PassthroughSubject<CMSampleBuffer, Never>()
   fileprivate let error$ = PassthroughSubject<Error, Never>()
   public var onCompressed: any Publisher<CMSampleBuffer, Never> { compressedBuffer$ }
   public var onError: any Publisher<Error, Never> { error$ }
 
-  init(configuration: Configuration) {
+  init(configuration: VideoCompressionConfiguration) {
     self.configuration = configuration
   }
 
@@ -123,49 +94,49 @@ extension VideoCodec {
 
 extension VideoCompressor {
   public static func create(
-    with configuration: Configuration
+    with configuration: VideoCompressionConfiguration
   ) throws -> VideoCompressor {
     var session: VTCompressionSession?
     let compressor = VideoCompressor(configuration: configuration)
 
     try ensureSuccess(
       osStatus:
-      VTCompressionSessionCreate(
-        allocator: kCFAllocatorDefault,
-        width: Int32(configuration.width),
-        height: Int32(configuration.height),
-        codecType: configuration.codec == .avc ? kCMVideoCodecType_H264 : kCMVideoCodecType_HEVC,
-        encoderSpecification: nil,
-        imageBufferAttributes: nil,
-        compressedDataAllocator: nil,
-        outputCallback: compressionOutbutCallback,
-        refcon: Unmanaged.passUnretained(compressor).toOpaque(),
-        compressionSessionOut: &session
-      )
+        VTCompressionSessionCreate(
+          allocator: kCFAllocatorDefault,
+          width: Int32(configuration.width),
+          height: Int32(configuration.height),
+          codecType: configuration.codec == .avc ? kCMVideoCodecType_H264 : kCMVideoCodecType_HEVC,
+          encoderSpecification: nil,
+          imageBufferAttributes: nil,
+          compressedDataAllocator: nil,
+          outputCallback: compressionOutbutCallback,
+          refcon: Unmanaged.passUnretained(compressor).toOpaque(),
+          compressionSessionOut: &session,
+        )
     )
     guard let session else {
       throw AVMediaCodersError.cannotCreateCompressor
     }
     try ensureSuccess(
       osStatus:
-      VTSessionSetProperty(
-        session,
-        key: kVTCompressionPropertyKey_RealTime,
-        value: kCFBooleanTrue
-      )
+        VTSessionSetProperty(
+          session,
+          key: kVTCompressionPropertyKey_RealTime,
+          value: kCFBooleanTrue,
+        )
     )
     VTCompressionSessionPrepareToEncodeFrames(session)
     try configuration.properties.forEach { key, value in
       logger.trace("Setting \(key) to \(value.description)")
       try ensureSuccess(
         osStatus:
-        VTSessionSetProperty(session, key: key, value: value)
+          VTSessionSetProperty(session, key: key, value: value)
       )
     }
     try configuration.codec.properties.forEach { key, value in
       try ensureSuccess(
         osStatus:
-        VTSessionSetProperty(session, key: key, value: value)
+          VTSessionSetProperty(session, key: key, value: value)
       )
     }
     compressor.compressionSession = session

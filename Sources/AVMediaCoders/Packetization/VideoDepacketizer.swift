@@ -1,8 +1,8 @@
 import CoreMedia
 
-public class VideoDeacketizer {
+public class VideoDepacketizer {
   let sampleBufferComposer: HEVCSampleBufferComposer = HEVCSampleBufferComposer()
-  
+
   public init() {}
 
   public func depacketize(_ packet: PESPacket) throws -> [CMSampleBuffer] {

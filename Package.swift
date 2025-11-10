@@ -18,13 +18,19 @@ let package = Package(
         .package(
             name: "AsyncUtils",
             path: "file:///Users/lixuanyu/swift_proj.nosync/AsyncUtils"
-        )
+        ),
+        .package(
+            url: "https://github.com/yu840915/LogContext.git",
+            branch: "main",
+        ),
     ],
 
     targets: [
         .target(
             name: "AVMediaCoders",
-            dependencies: []
+            dependencies: [
+                "LogContext",
+            ]
         ),
         .testTarget(
             name: "AVMediaCodersTests",
