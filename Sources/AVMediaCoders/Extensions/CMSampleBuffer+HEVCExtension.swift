@@ -1,4 +1,5 @@
 import CoreMedia
+import MPEGTransport
 
 extension CMSampleBuffer {
   func getHEVCParameterSets() throws -> [HEVCNALUnit]? {

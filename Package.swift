@@ -4,15 +4,20 @@
 import PackageDescription
 
 let package = Package(
-    name: "AVMediaCoders",
+    name: "MediaCoders",
     platforms: [
         .iOS(.v17),
         .macOS(.v15),
     ],
     products: [
         .library(
+            name: "MPEGTransport",
+            targets: ["MPEGTransport"],
+        ),
+        .library(
             name: "AVMediaCoders",
-            targets: ["AVMediaCoders"])
+            targets: ["AVMediaCoders"],
+        ),
     ],
     dependencies: [
         .package(
@@ -27,15 +32,22 @@ let package = Package(
 
     targets: [
         .target(
+            name: "MPEGTransport",
+            dependencies: [
+                "LogContext"
+            ],
+        ),
+        .target(
             name: "AVMediaCoders",
             dependencies: [
+                "MPEGTransport",
                 "LogContext",
             ]
         ),
         .testTarget(
-            name: "AVMediaCodersTests",
+            name: "MPEGTransportTests",
             dependencies: [
-                "AVMediaCoders",
+                "MPEGTransport",                
                 "AsyncUtils",
             ]
         ),

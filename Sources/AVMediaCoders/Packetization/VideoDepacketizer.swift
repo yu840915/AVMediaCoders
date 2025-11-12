@@ -1,4 +1,5 @@
 import CoreMedia
+import MPEGTransport
 
 public class VideoDepacketizer {
   let sampleBufferComposer: HEVCSampleBufferComposer = HEVCSampleBufferComposer()
