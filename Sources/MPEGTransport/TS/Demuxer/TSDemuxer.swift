@@ -1,4 +1,4 @@
-private let logger = MPEGLoggers.demuxing.build()
+private let logger = Loggers.demuxing.build()
 
 public protocol TSDemuxerOutputDelegate: AnyObject, Sendable {
   func demuxer(

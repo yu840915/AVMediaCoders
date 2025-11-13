@@ -1,4 +1,4 @@
-private let logger = MPEGLoggers.tsDepacketizing.build()
+private let logger = Loggers.tsDepacketizing.build()
 
 class TSDataDepacketizer {
   let PID: TSPID

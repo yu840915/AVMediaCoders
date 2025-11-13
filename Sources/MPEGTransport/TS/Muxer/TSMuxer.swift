@@ -1,4 +1,4 @@
-private let logger = MPEGLoggers.muxing.build()
+private let logger = Loggers.muxing.build()
 
 public protocol TSMuxerOutputDelegate: AnyObject, Sendable {
   func muxer(_ muxer: TSMuxer, didOutputPackets packets: [TSPacket])
