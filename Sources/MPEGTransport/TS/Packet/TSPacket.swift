@@ -5,7 +5,7 @@ public struct TSPacket: Equatable, Sendable {
     let header: TSHeader
     let payload: Payload
 
-    var bytes: [UInt8] { header.bytes + payload.bytes }
+    public var bytes: [UInt8] { header.bytes + payload.bytes }
 
     init(
         PID: TSPID,
