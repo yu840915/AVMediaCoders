@@ -23,7 +23,7 @@ public final class VideoCompressor {
   public var onCompressed: any Publisher<CMSampleBuffer, Never> { compressedBuffer$ }
   public var onError: any Publisher<Error, Never> { error$ }
 
-  init(configuration: VideoCompressionConfiguration) {
+  private init(configuration: VideoCompressionConfiguration) {
     self.configuration = configuration
   }
 

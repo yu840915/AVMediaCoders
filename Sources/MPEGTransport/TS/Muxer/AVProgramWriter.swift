@@ -65,6 +65,18 @@ public final class AVProgramWriter: Sendable {
         )
     }
 
+    public func sendVideoPackets(
+        _ packets: [PESPacket],
+        adaptationFieldConfiguration: TSPacket.AdaptationFieldConfiguration? = nil
+    ) async throws {
+        for packet in packets {
+            try await sendVideoData(
+                packet.bytes,
+                adaptationFieldConfiguration: adaptationFieldConfiguration,
+            )
+        }
+    }
+
     public func sendAudioData(
         _ esData: [UInt8],
         adaptationFieldConfiguration: TSPacket.AdaptationFieldConfiguration? = nil
@@ -74,6 +86,18 @@ public final class AVProgramWriter: Sendable {
             esData: esData,
             forPID: audioStreamPID,
         )
+    }
+
+    public func sendAudioPackets(
+        _ packets: [PESPacket],
+        adaptationFieldConfiguration: TSPacket.AdaptationFieldConfiguration? = nil
+    ) async throws {
+        for packet in packets {
+            try await sendAudioData(
+                packet.bytes,
+                adaptationFieldConfiguration: adaptationFieldConfiguration,
+            )
+        }
     }
 }
 

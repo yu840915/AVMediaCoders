@@ -1,7 +1,7 @@
 import CoreMedia
 import MPEGTransport
 
-public class HEVCSampleBufferDecomposer {
+public final class HEVCSampleBufferDecomposer: Sendable {
     public init() {}
 
     public func decompose(_ sampleBuffer: CMSampleBuffer) throws -> [HEVCNALUnit] {

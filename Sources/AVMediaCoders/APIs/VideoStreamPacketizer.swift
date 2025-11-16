@@ -1,4 +1,4 @@
-import Combine
+@preconcurrency import Combine
 import LogContext
 import MPEGTransport
 import VideoToolbox
@@ -8,18 +8,19 @@ private let logger = Loggers.packetizing.build()
 public protocol VideoStreamPacketizing {
   var streamID: UInt8 { get }
   func packetize(_ sampleBuffer: CMSampleBuffer)
-  var onOutputPES: any Publisher<PESPacket, Never> { get }
+  var onOutputPES: AnyPublisher<PESPacket, Never> { get }
 }
 
-extension VideoStreamPacketizing {
-  static func create(
-    streamID: UInt8,
-    configuration: VideoCompressionConfiguration
+public func createVideoPacketier(
+  streamID: UInt8,
+  configuration: VideoCompressionConfiguration
+) throws
+  -> any VideoStreamPacketizing
+{
+  try VideoStreamPacketizer(
+    streamID: streamID,
+    configuration: configuration
   )
-    -> any VideoStreamPacketizing
-  {
-    VideoStreamPacketizer(streamID: streamID, configuration: configuration)
-  }
 }
 
 public enum VideoCodec: LogContextValue {
@@ -68,9 +69,8 @@ public struct VideoCompressionConfiguration: Sendable, LogContextReading {
 }
 
 class VideoStreamPacketizer: VideoStreamPacketizing {
-
   let onOutputPES$ = PassthroughSubject<PESPacket, Never>()
-  var onOutputPES: any Publisher<PESPacket, Never> {
+  var onOutputPES: AnyPublisher<PESPacket, Never> {
     onOutputPES$.eraseToAnyPublisher()
   }
 
@@ -80,10 +80,13 @@ class VideoStreamPacketizer: VideoStreamPacketizing {
   private var bag = Set<AnyCancellable>()
   let logContext: LogContext
 
-  init(streamID: UInt8, configuration: VideoCompressionConfiguration) {
+  init(
+    streamID: UInt8,
+    configuration: VideoCompressionConfiguration
+  ) throws {
     self.streamID = streamID
     packetizer = VideoPacketizer()
-    compressor = VideoCompressor(configuration: configuration)
+    compressor = try VideoCompressor.create(with: configuration)
     logContext = .init {
       $0.addLabels(["Packetizer", "VideoStream"])
       $0["streamID"] = "\(streamID)"

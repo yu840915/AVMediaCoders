@@ -1,11 +1,11 @@
 import CoreMedia
 
-public  struct ISOMediaTimestamp: Equatable {
+public struct ISOMediaTimestamp: Equatable {
   let prefix: Prefix
   let value: UInt64
   init(prefix: Prefix, truncating: UInt64) {
     self.prefix = prefix
-    self.value = truncating & 0x1_FFFF_FFFF
+    value = truncating & 0x1_FFFF_FFFF
   }
 
   public init(bytes: [UInt8]) throws {
@@ -26,7 +26,7 @@ public  struct ISOMediaTimestamp: Equatable {
       throw MPEGTransportError.invalidISOTimestampPrefix
     }
     self.prefix = prefix
-    self.value =
+    value =
       (UInt64(part1) & 0b1110) << 29
       | UInt64(part2) << 22
       | (UInt64(part3) >> 1) << 15
@@ -49,9 +49,20 @@ extension ISOMediaTimestamp {
   static let audioTimeScale: CMTimeScale = 44100
 
   public init(prefix: Prefix, time: CMTime, timeScale: CMTimeScale) {
+    let converted: Int64
+    let value = time.value
+    let toScale = CMTimeValue(timeScale)
+    let fromScale = CMTimeValue(time.timescale)
+    if value < fromScale && toScale < fromScale {
+      converted = (value * toScale) / fromScale
+    } else if toScale < fromScale {
+      converted = (value / fromScale) * toScale
+    } else {
+      converted = value * (toScale / fromScale)
+    }
     self.init(
       prefix: prefix,
-      truncating: UInt64(time.value * CMTimeValue(timeScale) / Int64(time.timescale))
+      truncating: UInt64(converted)
     )
   }
 
