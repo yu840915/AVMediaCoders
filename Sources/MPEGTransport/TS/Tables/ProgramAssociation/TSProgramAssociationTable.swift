@@ -1,6 +1,17 @@
-public struct TSProgramAssociationTable: Equatable, Sendable {
+import LogContext
+
+public struct TSProgramAssociationTable: Equatable, Sendable, LogContextReading {
   public private(set) var versionNumber: UInt8
   public private(set) var programs: [UInt16: TSPID]
+  public var logContext: LogContext {
+    .init {
+      $0["ver"] = "\(versionNumber)"
+      $0["count"] = "\(programs.count)"
+      $0.setDebugDetail {
+        $0["programs"] = "\(programs)"
+      }
+    }
+  }
 
   init(
     versionNumber: UInt8 = 0,

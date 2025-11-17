@@ -154,3 +154,21 @@ extension TSPacket.Payload: CustomStringConvertible {
         }
     }
 }
+
+extension Array where Element == TSPacket {
+    public init(bytes: [UInt8]) throws {
+        var packets: [TSPacket] = []
+        var offset = 0
+        while offset + 188 <= bytes.count {
+            let packetBytes = [UInt8](bytes[offset..<offset + 188])
+            let packet = try TSPacket(bytes: packetBytes)
+            packets.append(packet)
+            offset += 188
+        }
+        self = packets
+    }
+
+    public var bytes: [UInt8] {
+        flatMap { $0.bytes }
+    }
+}

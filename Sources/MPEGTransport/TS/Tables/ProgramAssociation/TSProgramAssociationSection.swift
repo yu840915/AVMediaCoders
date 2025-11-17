@@ -1,3 +1,5 @@
+import LogContext
+
 struct TSProgramAssociationSection: TSTableSection {
   let tableHeader: TSTableHeader
   let byteRepresentation: ByteRepresentation
@@ -62,6 +64,19 @@ struct TSProgramAssociationSection: TSTableSection {
     )
     programMapPIDs = try byteRepresentation.programMapPIDs.map {
       try TSPIDEntry($0)
+    }
+  }
+}
+
+extension TSProgramAssociationSection: LogContextReading {
+  var logContext: LogContext {
+    LogContext {
+      $0[.id] = "PATSection"
+      $0["header"] = "\(tableHeader.logContext)"
+      $0["versionNumber"] = "\(versionNumber)"
+      $0["sectionNumber"] = "\(sectionNumber)"
+      $0["lastSectionNumber"] = "\(lastSectionNumber)"
+      $0["programMapPIDs.count"] = "\(programMapPIDs.count)"
     }
   }
 }
@@ -156,10 +171,16 @@ extension TSProgramAssociationSection {
     }
   }
 
-  struct TSPIDEntry: Equatable, Sendable {
+  struct TSPIDEntry: Equatable, Sendable, LogContextReading {
     var byteLength: UInt8 { 4 }
     let programNumber: UInt16
     let PID: TSPID
+    var logContext: LogContext {
+      .init {
+        $0["program"] = "\(programNumber)"
+        $0["PID"] = "\(PID)"
+      }
+    }
 
     init(programNumber: UInt16, PID: TSPID) {
       self.programNumber = programNumber

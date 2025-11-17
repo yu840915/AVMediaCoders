@@ -1,10 +1,12 @@
+import LogContext
+
 private let logger = Loggers.muxing.build()
 
 public protocol TSMuxerOutputDelegate: AnyObject, Sendable {
   func muxer(_ muxer: TSMuxer, didOutputPackets packets: [TSPacket])
 }
 
-public actor TSMuxer {
+public actor TSMuxer: LogContextReadingActor {
   private let PATPacketizer = TSDataPacketizer(pid: .programAssociationTable)
   public private(set) var programAssociationTable: TSProgramAssociationTable
   private var programs: [UInt16: Program] = [:]
@@ -15,10 +17,18 @@ public actor TSMuxer {
 
   private var nextAvailableStreamID: UInt16 = 0
   private weak var outputDelegate: TSMuxerOutputDelegate?
+  public private(set) var logContext: LogContext
 
-  public init(outputDelegate: TSMuxerOutputDelegate? = nil) async {
+  public init(
+    outputDelegate: TSMuxerOutputDelegate? = nil,
+    logContextBuilder: StructBuilder<LogContext>? = nil,
+  ) async {
     programAssociationTable = TSProgramAssociationTable()
     self.outputDelegate = outputDelegate
+    logContext = LogContext {
+      logContextBuilder?(&$0)
+      $0.addLabel("Muxer")
+    }
     signalTable()
   }
 
@@ -65,14 +75,17 @@ public actor TSMuxer {
       $0.programs[programNumber] = tablePID
     }
     nextAvailableStreamID = numberOfDataStreams + 1
-    logger.info(
-      "Program \(programNumber) created with PID \(tablePID)"
-    )
+    let context = logContext.adding {
+      $0["program"] = "\(programNumber)"
+      $0["PID"] = "\(tablePID)"
+    }
+    logger.info("Created program \(context.info)")
     signalTable()
   }
 
   public func signalTable() {
-    logger.trace("Signaling tables")
+    let context = logContext
+    logger.trace("Signal tables \(context.trace)")
     outputDelegate?.muxer(
       self,
       didOutputPackets: packetizePAT() + packetizePMTs()
@@ -90,7 +103,10 @@ public actor TSMuxer {
     else {
       throw MPEGTransportError.muxer(.dataStreamPIDMismatch)
     }
-    logger.trace("Sending data for PID \(PID)")
+    let context = logContext.adding {
+      $0["PID"] = "\(PID)"
+    }
+    logger.trace("Send data \(context.trace)")
     outputDelegate?.muxer(
       self,
       didOutputPackets: packetizer.packetize(

@@ -1,11 +1,24 @@
+import LogContext
+
 private let logger = Loggers.tsDepacketizing.build()
 
-class TSDataDepacketizer {
+class TSDataDepacketizer: LogContextReading {
   let PID: TSPID
   private(set) var stashedPackets: [TSPacket] = []
+  private(set) var logContext: LogContext
 
-  init(pid: TSPID) {
+  init(
+    pid: TSPID,
+    logContextBuilder: StructBuilder<LogContext>? = nil
+  ) {
     self.PID = pid
+    logContext = LogContext {
+      logContextBuilder?(&$0)
+      $0[.id] = "\(pid)"
+      $0.addLabel("Depacketizer")
+    }
+    let context = logContext
+    logger.info("Initialized  \(context.info)")
   }
 
   func feed(_ packets: [TSPacket]) -> [Output] {
@@ -15,6 +28,9 @@ class TSDataDepacketizer {
   func feed(_ packet: TSPacket) -> Output? {
     guard packet.header.pid == PID.value else {
       return nil
+    }
+    defer {
+      logContext["stashed"] = "\(stashedPackets.count)"
     }
     if packet.header.isStartOfPayload {
       let output = flush()
@@ -29,9 +45,15 @@ class TSDataDepacketizer {
   }
 
   func flush() -> Output? {
-    guard !stashedPackets.isEmpty else { return nil }
+    var context = logContext
+    guard !stashedPackets.isEmpty else {
+      context["reason"] = "no stashed packets"
+      logger.trace("Nothing to flush \(context.trace)")
+      return nil
+    }
     defer {
       stashedPackets.removeAll()
+      logContext["stashed"] = "\(stashedPackets.count)"
     }
     do {
       var counter = stashedPackets[0].header.continuityCounter
@@ -43,14 +65,21 @@ class TSDataDepacketizer {
         result.append(contentsOf: packet.payload.dataPayload)
       }
       if esData.isEmpty {
+        context["reason"] = "empty ES data"
+        logger.trace("Nothing to flush \(context.trace)")
         return nil
       }
+      context["esDataSize"] = "\(esData.count)"
+      logger.debug("Flushed \(context.debug)")
       return Output(
         esData: esData,
         adaptationField: stashedPackets[0].payload.adaptationField
       )
     } catch {
-      logger.warning("Error detected: \(error)")
+      let context = logContext.adding {
+        $0.setError(error)
+      }
+      logger.warning("Failed to flush \(context.warning)")
       return nil
     }
   }

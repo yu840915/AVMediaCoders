@@ -101,4 +101,22 @@ struct TSPacketTests {
     #expect(sut == src)
   }
 
+  @Test func encodeAndDecodePacketArray() async throws {
+    let src = [
+      TSPacket(
+        PID: .dataStream(streamID: 1), continuityCounter: 0x0, data: [0x40]
+      ),
+      TSPacket(
+        PID: .dataStream(streamID: 1), continuityCounter: 0x1, data: [0x41]
+      ),
+      TSPacket(
+        PID: .dataStream(streamID: 1), continuityCounter: 0x2, data: [0x42]
+      ),
+    ]
+    let bytes = src.bytes
+
+    let sut = try [TSPacket](bytes: bytes)
+
+    #expect(sut == src)
+  }
 }

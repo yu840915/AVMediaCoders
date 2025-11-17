@@ -1,4 +1,6 @@
-struct TSTableHeader: Equatable {
+import LogContext
+
+struct TSTableHeader: Equatable, Sendable, LogContextReading {
   let tableID: TableID
   var isPrivateSection: Bool {
     byteRepresentation.privateIndicator
@@ -9,6 +11,12 @@ struct TSTableHeader: Equatable {
   let byteRepresentation: ByteRepresentation
   var bytes: [UInt8] {
     byteRepresentation.bytes
+  }
+  var logContext: LogContext {
+    .init {
+      $0[.id] = "\(tableID)"
+      $0["sectionLength"] = "\(sectionLength)"
+    }
   }
 
   init(tableID: TableID, sectionLength: UInt16) throws {
@@ -37,7 +45,7 @@ struct TSTableHeader: Equatable {
 }
 
 extension TSTableHeader {
-  enum TableID: Equatable {
+  enum TableID: Equatable, LogContextValue {
     case programAssociationSection
     case conditionalAccessSection
     case TSProgramMapSection
@@ -76,6 +84,21 @@ extension TSTableHeader {
       case .IPMPControlInformationSection: return 0x07
       case .reserved: return 0x08
       case let .userPrivate(id): return 0x40 + id
+      }
+    }
+
+    var description: String {
+      switch self {
+      case .programAssociationSection: "Program Association"
+      case .conditionalAccessSection: "Conditional Access"
+      case .TSProgramMapSection: "TS Program Map"
+      case .TSDescriptionSection: "TS Description"
+      case .ISO14496SceneDescriptionSection: "ISO 14496 Scene Description"
+      case .ISO14496ObjectDescriptionSection: "ISO 14496 Object Description"
+      case .metadataSection: "Metadata"
+      case .IPMPControlInformationSection: "IPMP Control Information"
+      case .reserved: "Reserved"
+      case let .userPrivate(id): "User Private (id: \(id))"
       }
     }
 
