@@ -12,6 +12,16 @@ public enum VideoType: Sendable {
         case .hevc: .videoHEVC
         }
     }
+
+    static func from(streamType: TSStreamType) -> VideoType? {
+        switch streamType {
+        case .videoMPEG1: .mpeg1
+        case .videoMPEG2: .mpeg2
+        case .videoAVC: .avc
+        case .videoHEVC: .hevc
+        default: nil
+        }
+    }
 }
 
 public enum AudioType: Sendable {
@@ -26,6 +36,16 @@ public enum AudioType: Sendable {
         case .mpeg2: .audioMPEG2HalvedSampleRate
         case .aac: .audioADTSAAC
         case .dolbyDigital: .audioATSCDolbyDigital
+        }
+    }
+
+    static func from(streamType: TSStreamType) -> AudioType? {
+        switch streamType {
+        case .audioMPEG1: .mpeg1
+        case .audioMPEG2HalvedSampleRate: .mpeg2
+        case .audioADTSAAC: .aac
+        case .audioATSCDolbyDigital: .dolbyDigital
+        default: nil
         }
     }
 }

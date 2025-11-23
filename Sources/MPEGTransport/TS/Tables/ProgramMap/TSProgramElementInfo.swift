@@ -88,6 +88,22 @@ public enum TSStreamType: Equatable, Sendable {
   case audioATSCDolbyDigital
   case IPMP
   case unsupported(value: UInt8)
+  public var isVideo: Bool {
+    switch self {
+    case .videoMPEG1, .videoMPEG2, .videoAVC, .videoHEVC:
+      true
+    default:
+      false
+    }
+  }
+  public var isAudio: Bool {
+    switch self {
+    case .audioMPEG1, .audioMPEG2HalvedSampleRate, .audioADTSAAC, .audioATSCDolbyDigital:
+      true
+    default:
+      false
+    }
+  }
 
   init(rawValue: UInt8) {
     switch rawValue {

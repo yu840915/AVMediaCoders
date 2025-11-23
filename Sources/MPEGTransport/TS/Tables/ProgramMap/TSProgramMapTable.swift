@@ -4,6 +4,12 @@ public struct TSProgramMapTable: Equatable, Sendable {
   public private(set) var PCRPID: TSPID
   public private(set) var programInfo: [UInt8]
   public private(set) var programElementInfos: [TSProgramElementInfo]
+  var videoElements: [TSProgramElementInfo] {
+    programElementInfos.filter { $0.streamType.isVideo }
+  }
+  var audioElements: [TSProgramElementInfo] {
+    programElementInfos.filter { $0.streamType.isAudio }
+  }
 
   init(
     programNumber: UInt16,
