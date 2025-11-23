@@ -47,7 +47,7 @@ let package = Package(
         .testTarget(
             name: "MPEGTransportTests",
             dependencies: [
-                "MPEGTransport",                
+                "MPEGTransport",
                 "AsyncUtils",
             ]
         ),

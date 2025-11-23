@@ -8,11 +8,17 @@ public final class AVProgramDemuxerOutputDelegate: TSDemuxerOutputDelegate {
     newProgram$.eraseToAnyPublisher()
   }
   private let newProgram$: PassthroughSubject<AVProgramReader, Never>
-  private let actor = DemuxerOutputDelegateActor()
+  private let actor: DemuxerOutputDelegateActor
   private nonisolated(unsafe) var bag = Set<AnyCancellable>()
 
-  public init() async {
+  public init(logContextBuilder: StructBuilder<LogContext>? = nil) async {
     newProgram$ = .init()
+    actor = DemuxerOutputDelegateActor(
+      logContext: .init {
+        logContextBuilder?(&$0)
+        $0.addLabel("AVDemuxer")
+      }
+    )
     await actor.onNewProgram
       .sink { [weak self] program in
         self?.newProgram$.send(program)
@@ -66,11 +72,9 @@ actor DemuxerOutputDelegateActor {
   private let newProgram$: PassthroughSubject<AVProgramReader, Never>
   private var logContext: LogContext
 
-  init() {
+  init(logContext: LogContext) {
     newProgram$ = .init()
-    logContext = .init {
-      $0.addLabel("AVDemuxer")
-    }
+    self.logContext = logContext
   }
 
   public func demuxer(
