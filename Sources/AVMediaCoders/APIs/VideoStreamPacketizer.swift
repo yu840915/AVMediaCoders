@@ -23,18 +23,6 @@ public func createVideoPacketier(
   )
 }
 
-public enum VideoCodec: LogContextValue {
-  case avc
-  case hevc
-
-  public var description: String {
-    switch self {
-    case .avc: "AVC"
-    case .hevc: "HEVC"
-    }
-  }
-}
-
 public struct VideoCompressionConfiguration: Sendable, LogContextReading {
   public var width: Int
   public var height: Int
