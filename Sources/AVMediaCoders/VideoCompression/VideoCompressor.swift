@@ -1,4 +1,4 @@
-import Combine
+@preconcurrency import Combine
 import VideoToolbox
 
 private let logger = Loggers.compressing.build()
@@ -18,13 +18,17 @@ extension VideoCompressionConfiguration {
 public final class VideoCompressor {
   let configuration: VideoCompressionConfiguration
   fileprivate(set) var compressionSession: VTCompressionSession!
-  fileprivate let compressedBuffer$ = PassthroughSubject<CMSampleBuffer, Never>()
-  fileprivate let error$ = PassthroughSubject<Error, Never>()
-  public var onCompressed: any Publisher<CMSampleBuffer, Never> { compressedBuffer$ }
-  public var onError: any Publisher<Error, Never> { error$ }
+  fileprivate let compressedBuffer$: PassthroughSubject<CMSampleBuffer, Never>
+  fileprivate let error$: PassthroughSubject<any Error, Never>
+  public let onCompressed: AnyPublisher<CMSampleBuffer, Never>
+  public let onError: AnyPublisher<any Error, Never>
 
   private init(configuration: VideoCompressionConfiguration) {
     self.configuration = configuration
+    compressedBuffer$ = PassthroughSubject<CMSampleBuffer, Never>()
+    error$ = PassthroughSubject<any Error, Never>()
+    onCompressed = compressedBuffer$.eraseToAnyPublisher()
+    onError = error$.eraseToAnyPublisher()
   }
 
   public func compress(sampleBuffer: CMSampleBuffer) {
@@ -82,11 +86,11 @@ extension VideoCodec {
     switch self {
     case .avc:
       [
-        kVTCompressionPropertyKey_ProfileLevel: kVTProfileLevel_H264_Main_AutoLevel,
+        kVTCompressionPropertyKey_ProfileLevel: kVTProfileLevel_H264_Main_AutoLevel
       ]
     case .hevc:
       [
-        kVTCompressionPropertyKey_ProfileLevel: kVTProfileLevel_HEVC_Main_AutoLevel,
+        kVTCompressionPropertyKey_ProfileLevel: kVTProfileLevel_HEVC_Main_AutoLevel
       ]
     }
   }
