@@ -22,7 +22,9 @@ public class HEVCSampleBufferComposer {
     return try mergeSampleBuffers(from: nalUnits)
   }
 
-  fileprivate func mergeSampleBuffers(from nalUnits: [HEVCNALUnit]) throws -> [CMSampleBuffer] {
+  fileprivate func mergeSampleBuffers(
+    from nalUnits: [HEVCNALUnit]
+  ) throws -> [CMSampleBuffer] {
     if nalUnits.isEmpty {
       return []
     }
@@ -38,19 +40,28 @@ public class HEVCSampleBufferComposer {
       return try extractFormatDescription(from: Array(nalUnits[lastSliceIndex...]))
     }
   }
-
-  fileprivate func merge(_ nalUnits: [HEVCNALUnit], formatDescription: CMFormatDescription) throws
-    -> [CMSampleBuffer]
-  {
+  fileprivate func merge(
+    _ nalUnits: [HEVCNALUnit],
+    formatDescription: CMFormatDescription,
+  ) throws -> [CMSampleBuffer] {
     if nalUnits.isEmpty {
       return []
     }
-    var bytes: [UInt8] = []
-    for nalu in nalUnits {
-      let naluBytes = nalu.bytes
-      bytes.append(contentsOf: UInt32(naluBytes.count).bigEndianBytes)
-      bytes.append(contentsOf: naluBytes)
+    return try nalUnits.compactMap {
+      try merge($0, formatDescription: formatDescription)
     }
+  }
+
+  fileprivate func merge(
+    _ nalUnit: HEVCNALUnit,
+    formatDescription: CMFormatDescription,
+  ) throws
+    -> CMSampleBuffer?
+  {
+    var bytes: [UInt8] = []
+    let naluBytes = nalUnit.bytes
+    bytes.append(contentsOf: UInt32(naluBytes.count).bigEndianBytes)
+    bytes.append(contentsOf: naluBytes)
     var blockBuffer: CMBlockBuffer?
     try ensureSuccess(
       osStatus: CMBlockBufferCreateWithMemoryBlock(
@@ -96,7 +107,14 @@ public class HEVCSampleBufferComposer {
     guard let sampleBuffer = sampleBuffer else {
       throw AVMediaCodersError.missingBuffer
     }
-    return [sampleBuffer]
+    if nalUnit.isKeyFrame {
+      let key = Unmanaged.passUnretained(kCMSampleAttachmentKey_DependsOnOthers).toOpaque()
+      let value = Unmanaged.passUnretained(kCFBooleanFalse).toOpaque()
+      sampleBuffer.configureAttachments {
+        CFDictionarySetValue($0, key, value)
+      }
+    }
+    return sampleBuffer
   }
 
   fileprivate func extractFormatDescription(from nalUnits: [HEVCNALUnit]) throws -> [CMSampleBuffer]

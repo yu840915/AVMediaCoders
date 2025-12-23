@@ -103,7 +103,7 @@ public struct HEVCNALUnitHeader: Equatable {
 public struct HEVCNALUnit {
   public let header: HEVCNALUnitHeader
   public let payload: [UInt8]
-  var isKeyFrame: Bool {
+  public var isKeyFrame: Bool {
     header.type.isKeyFrame
   }
   public var isFormatDescription: Bool {

@@ -1,24 +1,54 @@
 import Combine
+import LogContext
 import VideoToolbox
 
 private let logger = Loggers.decompressing.build()
 
-final class VideoDecompressor {
-  let formatDescription: CMVideoFormatDescription
+public final class VideoDecompressor: LogContextReading {
+  private(set) var formatDescription: CMVideoFormatDescription
   private(set) var decompressionSession: VTDecompressionSession!
   private let decompressedBuffer$ = PassthroughSubject<CMSampleBuffer, Never>()
   private let error$ = PassthroughSubject<Error, Never>()
-  var onDecompressed: AnyPublisher<CMSampleBuffer, Never> {
-    decompressedBuffer$.eraseToAnyPublisher()
-  }
-  var onError: AnyPublisher<Error, Never> { error$.eraseToAnyPublisher() }
+  public let onDecompressed: AnyPublisher<CMSampleBuffer, Never>
+  public let onError: AnyPublisher<Error, Never>
+  public let logContext: LogContext
 
   init(formatDescription: CMVideoFormatDescription) {
     self.formatDescription = formatDescription
+    onDecompressed = decompressedBuffer$.eraseToAnyPublisher()
+    onError = error$.eraseToAnyPublisher()
+    logContext = LogContext {
+      $0.addLabel(.videoDecompressor)
+    }
+  }
+
+  deinit {
+    VTDecompressionSessionInvalidate(decompressionSession)
   }
 
   public func decompress(_ buffer: CMSampleBuffer) {
     var outFlags: VTDecodeInfoFlags = []
+    if let newFormat = buffer.formatDescription,
+      !VTDecompressionSessionCanAcceptFormatDescription(
+        decompressionSession,
+        formatDescription: newFormat,
+      )
+    {
+      do {
+        let newSession = try VideoDecompressor.createDecompressionSession(
+          formatDescription: newFormat,
+          decompressor: self
+        )
+        decompressionSession = newSession
+      } catch {
+        error$.send(error)
+      }
+    }
+    let context = logContext.adding {
+      $0.addLabel(.videoCodec)
+      $0["buffer"] = buffer.logContext
+    }
+    logger.trace("Will decompress frame \(context.trace)")
     let status = VTDecompressionSessionDecodeFrame(
       decompressionSession,
       sampleBuffer: buffer,
@@ -89,16 +119,32 @@ final class VideoDecompressor {
 }
 
 extension VideoDecompressor {
-  public static func create(formatDescription: CMVideoFormatDescription) throws -> VideoDecompressor
-  {
+  public static func create(
+    formatDescription: CMVideoFormatDescription
+  ) throws -> VideoDecompressor {
+    let decompressor = VideoDecompressor(
+      formatDescription: formatDescription,
+    )
+    let session = try createDecompressionSession(
+      formatDescription: formatDescription,
+      decompressor: decompressor,
+    )
+    decompressor.decompressionSession = session
+    return decompressor
+  }
+
+  static func createDecompressionSession(
+    formatDescription: CMVideoFormatDescription,
+    decompressor: VideoDecompressor
+  ) throws -> VTDecompressionSession {
     var session: VTDecompressionSession?
-    let decompressor = VideoDecompressor(formatDescription: formatDescription)
     var formatType = kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
     let attr =
       [
         kCVPixelBufferPixelFormatTypeKey as NSString: CFNumberCreate(
           kCFAllocatorDefault, .sInt32Type, &formatType)
       ] as CFDictionary
+
     var record = VTDecompressionOutputCallbackRecord()
     record.decompressionOutputCallback = VideoDecompressor.outputCallback
     record.decompressionOutputRefCon = Unmanaged.passUnretained(decompressor).toOpaque()
@@ -106,17 +152,22 @@ extension VideoDecompressor {
       osStatus: VTDecompressionSessionCreate(
         allocator: kCFAllocatorDefault,
         formatDescription: formatDescription,
-        decoderSpecification: nil,
-        imageBufferAttributes: attr,
+        decoderSpecification: attr,
+        imageBufferAttributes: nil,
         outputCallback: &record,
         decompressionSessionOut: &session
       )
     )
-    guard let session else {
+    guard
+      let session,
+      VTDecompressionSessionCanAcceptFormatDescription(
+        session,
+        formatDescription: formatDescription,
+      )
+    else {
       throw AVMediaCodersError.cannotCreateDecompressor
     }
-    decompressor.decompressionSession = session
-    return decompressor
+    return session
   }
 
   static let outputCallback: VTDecompressionOutputCallback = {

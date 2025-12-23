@@ -18,12 +18,9 @@ public func createVideoDepacketizer(
 }
 
 class VideoStreamDepacketizer: VideoStreamDepacketizing {
-  let onOutputSampleBuffer$ = PassthroughSubject<CMSampleBuffer, Never>()
+  let outputSampleBuffer$ = PassthroughSubject<CMSampleBuffer, Never>()
   let streamID: UInt8
-  var onOutputSampleBuffer: AnyPublisher<CMSampleBuffer, Never> {
-    onOutputSampleBuffer$.eraseToAnyPublisher()
-  }
-
+  let onOutputSampleBuffer: AnyPublisher<CMSampleBuffer, Never>
   let depacketizer: VideoDepacketizer
   private var decoder: VideoDecompressor?
   let logContext: LogContext
@@ -32,6 +29,7 @@ class VideoStreamDepacketizer: VideoStreamDepacketizing {
   init(streamID: UInt8) {
     self.streamID = streamID
     depacketizer = VideoDepacketizer()
+    onOutputSampleBuffer = outputSampleBuffer$.eraseToAnyPublisher()
     logContext = .init {
       $0.addLabels(["Depacketizer", "VideoStream"])
       $0["streamID"] = "\(streamID)"
@@ -44,6 +42,7 @@ class VideoStreamDepacketizer: VideoStreamDepacketizing {
     do {
       let buffers = try depacketizer.depacketize(pesPacket)
       for buffer in buffers {
+        // outputSampleBuffer$.send(buffer)
         decode(buffer)
       }
     } catch {
@@ -57,10 +56,13 @@ class VideoStreamDepacketizer: VideoStreamDepacketizing {
   func decode(
     _ buffer: CMSampleBuffer
   ) {
+    let context = logContext
     if let decoder {
+      logger.trace("Will decode frame \(context.trace)")
       decoder.decompress(buffer)
     } else if let format = buffer.formatDescription {
       let decoder = try! VideoDecompressor.create(formatDescription: format)
+      logger.trace("Set up decoder \(context.trace)")
       setUp(for: decoder)
       decoder.decompress(buffer)
     }
@@ -68,12 +70,26 @@ class VideoStreamDepacketizer: VideoStreamDepacketizing {
 
   func setUp(for decoder: VideoDecompressor) {
     self.decoder = decoder
+    var bag = Set<AnyCancellable>()
     decoder.onDecompressed.sink { [weak self] output in
       self?.send(output)
     }.store(in: &bag)
+    decoder.onError.sink { [weak self] error in
+      self?.handle(error)
+    }.store(in: &bag)
+    self.bag = bag
   }
 
-  func send(_ buffer: CMSampleBuffer) {    
-    onOutputSampleBuffer$.send(buffer)
+  func send(_ buffer: CMSampleBuffer) {
+    let context = logContext
+    logger.trace("Decoded frame into sample buffer \(context.trace)")
+    outputSampleBuffer$.send(buffer)
+  }
+
+  func handle(_ error: any Error) {
+    let context = logContext.adding {
+      $0.setError(error)
+    }
+    logger.warning("Decoder error \(context.warning)")
   }
 }
