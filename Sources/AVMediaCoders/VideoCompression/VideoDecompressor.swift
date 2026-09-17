@@ -1,46 +1,109 @@
-import Combine
+@preconcurrency import Combine
 import LogContext
+import RemoteCameraCore
 import VideoToolbox
 
 private let logger = Loggers.decompressing.build()
 
-public final class VideoDecompressor: LogContextReading {
-  private(set) var formatDescription: CMVideoFormatDescription
+public final class VideoDecompressor: LogContextReadable {
+  private(set) var compressedBufferFormatDescription: CMVideoFormatDescription
   private(set) var decompressionSession: VTDecompressionSession!
-  private let decompressedBuffer$ = PassthroughSubject<CMSampleBuffer, Never>()
-  private let error$ = PassthroughSubject<Error, Never>()
-  public let onDecompressed: AnyPublisher<CMSampleBuffer, Never>
+  private var imageBufferFormatDescription: CMVideoFormatDescription?
+  private let decompressedBuffer$ = PassthroughSubject<VideoFrame, Never>()
+  private let error$: PassthroughSubject<any Error, Never> = PassthroughSubject<Error, Never>()
+  public let onDecompressed: AnyPublisher<VideoFrame, Never>
   public let onError: AnyPublisher<Error, Never>
   public let logContext: LogContext
+  private let annotations: VideoFrameAnnotationActor
+  private let events: AsyncStream<AnnotationEvent>.Continuation
+  private var pump: Task<Void, Never>?
 
   init(formatDescription: CMVideoFormatDescription) {
-    self.formatDescription = formatDescription
+    compressedBufferFormatDescription = formatDescription
     onDecompressed = decompressedBuffer$.eraseToAnyPublisher()
     onError = error$.eraseToAnyPublisher()
     logContext = LogContext {
       $0.addLabel(.videoDecompressor)
     }
+    annotations = VideoFrameAnnotationActor()
+    let (stream, continuation) = AsyncStream.makeStream(of: AnnotationEvent.self)
+    events = continuation
+    pump = startPump(for: stream)
   }
 
   deinit {
-    VTDecompressionSessionInvalidate(decompressionSession)
+    events.finish()
+    pump?.cancel()
+    if let decompressionSession {
+      VTDecompressionSessionInvalidate(decompressionSession)
+    }
   }
 
-  public func decompress(_ buffer: CMSampleBuffer) {
+  private func startPump(
+    for stream: AsyncStream<AnnotationEvent>
+  ) -> Task<Void, Never> {
+    let annotations = self.annotations
+    nonisolated(unsafe) let subject = decompressedBuffer$
+    return Task {
+      for await event in stream {
+        switch event {
+        case .annotate(let annotation):
+          await annotations.push(annotation)
+        case .output(let output):
+          let annotation = await annotations.popUntil(output.timestamp)
+          subject.send(
+            VideoFrame(
+              buffer: output.buffer,
+              imageOrientation: annotation?.imageOrientation,
+              inputDeviceDirection: annotation?.inputDeviceDirection
+            )
+          )
+        }
+      }
+    }
+  }
+
+  public func decompress(_ frame: VideoFrame) {
     var outFlags: VTDecodeInfoFlags = []
+    let buffer = frame.buffer
+    events.yield(
+      .annotate(
+        VideoFrameAnnotation(
+          timestamp: buffer.presentationTimeStamp,
+          imageOrientation: frame.imageOrientation,
+          inputDeviceDirection: frame.inputDeviceDirection
+        )
+      )
+    )
     if let newFormat = buffer.formatDescription,
       !VTDecompressionSessionCanAcceptFormatDescription(
         decompressionSession,
-        formatDescription: newFormat,
+        formatDescription: newFormat
       )
     {
+      let context = logContext.adding {
+        $0.addLabel(.videoCodec)
+        $0["old"] = compressedBufferFormatDescription.logContext
+        $0["new"] = newFormat.logContext
+      }
+      logger.notice(
+        "Session rejected the frame's format description, recreating \(context.notice)")
       do {
         let newSession = try VideoDecompressor.createDecompressionSession(
           formatDescription: newFormat,
           decompressor: self
         )
+        let oldSession = decompressionSession
         decompressionSession = newSession
+        compressedBufferFormatDescription = newFormat
+        if let oldSession {
+          VTDecompressionSessionInvalidate(oldSession)
+        }
       } catch {
+        let context = context.adding {
+          $0.setError(error)
+        }
+        logger.error("Cannot recreate decompression session \(context.error)")
         error$.send(error)
       }
     }
@@ -48,7 +111,6 @@ public final class VideoDecompressor: LogContextReading {
       $0.addLabel(.videoCodec)
       $0["buffer"] = buffer.logContext
     }
-    logger.trace("Will decompress frame \(context.trace)")
     let status = VTDecompressionSessionDecodeFrame(
       decompressionSession,
       sampleBuffer: buffer,
@@ -57,6 +119,12 @@ public final class VideoDecompressor: LogContextReading {
       infoFlagsOut: &outFlags
     )
     if status != noErr {
+      let failure = context.adding {
+        $0["status"] = "\(status)"
+        $0["stage"] = "VTDecompressionSessionDecodeFrame"
+        $0["sessionFormat"] = compressedBufferFormatDescription.logContext
+      }
+      logger.error("Cannot submit frame to decoder \(failure.error)")
       error$.send(AVMediaCodersError.framework(status))
     }
   }
@@ -67,9 +135,15 @@ public final class VideoDecompressor: LogContextReading {
     infoFlags: VTDecodeInfoFlags,
     buffer: CVImageBuffer?,
     timestamp: CMTime,
-    duration: CMTime,
+    duration: CMTime
   ) {
     guard status == noErr else {
+      let context = logContext.adding {
+        $0["status"] = "\(status)"
+        $0["stage"] = "decompressionOutputCallback"
+        $0["pts"] = "\(timestamp.seconds)"
+      }
+      logger.error("Decoder returned a failure for a frame \(context.error)")
       error$.send(AVMediaCodersError.framework(status))
       return
     }
@@ -85,10 +159,17 @@ public final class VideoDecompressor: LogContextReading {
       let sampleBuffer = try createSampleBuffer(
         from: buffer,
         timestamp: timestamp,
-        duration: duration,
+        duration: duration
       )
-      decompressedBuffer$.send(sampleBuffer)
+      events.yield(
+        .output(DecodedOutput(buffer: sampleBuffer, timestamp: timestamp))
+      )
     } catch {
+      let context = logContext.adding {
+        $0.setError(error)
+        $0["stage"] = "wrapping the decoded pixel buffer"
+      }
+      logger.error("Cannot wrap decoded frame in a sample buffer \(context.error)")
       error$.send(error)
     }
   }
@@ -103,11 +184,12 @@ public final class VideoDecompressor: LogContextReading {
       presentationTimeStamp: timestamp,
       decodeTimeStamp: .invalid
     )
+    let decodedFormat = try createImageFormatIfMismatch(for: pixelBuffer)
     var sampleBuffer: CMSampleBuffer?
     let status = CMSampleBufferCreateReadyWithImageBuffer(
       allocator: kCFAllocatorDefault,
       imageBuffer: pixelBuffer,
-      formatDescription: formatDescription,
+      formatDescription: decodedFormat,
       sampleTiming: &timingInfo,
       sampleBufferOut: &sampleBuffer
     )
@@ -116,6 +198,32 @@ public final class VideoDecompressor: LogContextReading {
     }
     return sampleBuffer
   }
+
+  private func createImageFormatIfMismatch(
+    for pixelBuffer: CVImageBuffer
+  ) throws -> CMVideoFormatDescription {
+    if let imageBufferFormatDescription,
+      CMVideoFormatDescriptionMatchesImageBuffer(
+        imageBufferFormatDescription,
+        imageBuffer: pixelBuffer
+      )
+    {
+      return imageBufferFormatDescription
+    }
+    var format: CMVideoFormatDescription?
+    try ensureSuccess(
+      osStatus: CMVideoFormatDescriptionCreateForImageBuffer(
+        allocator: kCFAllocatorDefault,
+        imageBuffer: pixelBuffer,
+        formatDescriptionOut: &format
+      )
+    )
+    guard let format else {
+      throw AVMediaCodersError.missingBuffer
+    }
+    imageBufferFormatDescription = format
+    return format
+  }
 }
 
 extension VideoDecompressor {
@@ -123,11 +231,11 @@ extension VideoDecompressor {
     formatDescription: CMVideoFormatDescription
   ) throws -> VideoDecompressor {
     let decompressor = VideoDecompressor(
-      formatDescription: formatDescription,
+      formatDescription: formatDescription
     )
     let session = try createDecompressionSession(
       formatDescription: formatDescription,
-      decompressor: decompressor,
+      decompressor: decompressor
     )
     decompressor.decompressionSession = session
     return decompressor
@@ -162,7 +270,7 @@ extension VideoDecompressor {
       let session,
       VTDecompressionSessionCanAcceptFormatDescription(
         session,
-        formatDescription: formatDescription,
+        formatDescription: formatDescription
       )
     else {
       throw AVMediaCodersError.cannotCreateDecompressor
@@ -178,19 +286,25 @@ extension VideoDecompressor {
       infoFlags: VTDecodeInfoFlags,
       buffer: CVImageBuffer?,
       timestamp: CMTime,
-      duration: CMTime,
+      duration: CMTime
     ) in
+    var context = LogContext {
+      $0.addLabel(.videoDecompressor)
+    }
     guard let refcon: UnsafeMutableRawPointer = outputCallbackRefCon else {
-      logger.warning("Missing refcon")
+      context["reason"] = "Missing refcon"
+      logger.warning("Decompression failed \(context.warning)")
       return
     }
     let ptr = Unmanaged<VideoDecompressor>.fromOpaque(refcon)
     guard let decompressor = ptr.takeUnretainedValue() as VideoDecompressor? else {
-      logger.warning("Missing compressor")
+      context["reason"] = "Missing decompressor"
+      logger.warning("Decompression failed \(context.warning)")
       return
     }
     guard let pixelBuffer: CVPixelBuffer = buffer else {
-      logger.warning("Cannot get pixel buffer")
+      context["reason"] = "Missing pixel buffer"
+      logger.warning("Decompression failed \(context.warning)")
       return
     }
     sourceFrameRefCon?.assumingMemoryBound(to: CVPixelBuffer.self).pointee = pixelBuffer
@@ -203,4 +317,50 @@ extension VideoDecompressor {
       duration: duration
     )
   }
+}
+
+actor VideoFrameAnnotationActor {
+  private(set) var annotations: [VideoFrameAnnotation] = []
+  private var latest: VideoFrameAnnotation?
+  private let capacity = 120
+
+  func push(_ annotation: VideoFrameAnnotation) {
+    if let last = annotations.last,
+      last.timestamp >= annotation.timestamp
+    {
+      return
+    }
+    annotations.append(annotation)
+    if annotations.count > capacity {
+      annotations.removeFirst(annotations.count - capacity)
+    }
+  }
+
+  func popUntil(_ timestamp: CMTime) -> VideoFrameAnnotation? {
+    var annotation: VideoFrameAnnotation?
+    while let first = annotations.first, first.timestamp <= timestamp {
+      annotation = first
+      annotations.removeFirst()
+    }
+    if let annotation {
+      latest = annotation
+    }
+    return annotation ?? latest
+  }
+}
+
+private struct DecodedOutput: @unchecked Sendable {
+  let buffer: CMSampleBuffer
+  let timestamp: CMTime
+}
+
+private enum AnnotationEvent: Sendable {
+  case annotate(VideoFrameAnnotation)
+  case output(DecodedOutput)
+}
+
+struct VideoFrameAnnotation: Sendable {
+  let timestamp: CMTime
+  let imageOrientation: ImageOrientation?
+  let inputDeviceDirection: DeviceDirection?
 }

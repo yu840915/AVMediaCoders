@@ -21,6 +21,14 @@ extension CMSampleBuffer {
     return false
   }
 
+  func configureAttachment<T: AnyObject>(_ value: T, forKey key: CFString) {
+    let keyPtr = Unmanaged.passUnretained(key).toOpaque()
+    let valuePtr = Unmanaged.passUnretained(value).toOpaque()
+    configureAttachments {
+      CFDictionarySetValue($0, keyPtr, valuePtr)
+    }
+  }
+
   func configureAttachments(_ configure: (inout CFMutableDictionary) -> Void) {
     guard
       let attachments =
@@ -46,7 +54,7 @@ struct CompressedDataInfo {
   let isKeyFrame: Bool
 }
 
-extension CMSampleBuffer: @retroactive LogContextReading {
+extension CMSampleBuffer: @retroactive LogContextReadable {
   public var logContext: LogContext {
     LogContext {
       $0["format"] = self.formatDescription?.logContext
@@ -68,7 +76,7 @@ extension CMSampleBuffer.DataReadiness: @retroactive CustomStringConvertible {
     switch self {
     case .ready: "ready"
     case .notReady: "notReady"
-    case let .failed(status): "failed(\(status))"
+    case .failed(let status): "failed(\(status))"
     @unknown default:
       fatalError()
     }
@@ -81,7 +89,7 @@ extension CMTime: @retroactive CustomStringConvertible {
   }
 }
 
-extension CMFormatDescription: @retroactive LogContextReading {
+extension CMFormatDescription: @retroactive LogContextReadable {
   public var logContext: LogContext {
     LogContext {
       $0["len"] = self.nalUnitHeaderLength

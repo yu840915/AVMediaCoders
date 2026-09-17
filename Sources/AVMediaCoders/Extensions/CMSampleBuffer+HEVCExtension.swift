@@ -20,24 +20,6 @@ extension CMSampleBuffer {
     let nalus = try Array(0..<count).map {
       try getHEVCParameterSet(at: $0, from: formatDescription)
     }
-    let datas = nalus.map { $0.bytes }
-    let sizes = datas.map { $0.count }
-    let pointer = datas.map {
-      $0.withUnsafeBufferPointer { $0 }.baseAddress!
-    }
-    var formatDescriptionOut: CMFormatDescription?
-    try ensureSuccess(
-      osStatus: CMVideoFormatDescriptionCreateFromHEVCParameterSets(
-        allocator: kCFAllocatorDefault,
-        parameterSetCount: sizes.count,
-        parameterSetPointers: pointer,
-        parameterSetSizes: sizes,
-        nalUnitHeaderLength: 4,
-        extensions: nil,
-        formatDescriptionOut: &formatDescriptionOut
-      )
-    )
-    assert(formatDescriptionOut != nil)
     return nalus
   }
 

@@ -1,4 +1,6 @@
-public struct TSAdaptationField: Equatable, Sendable {
+import LogContext
+
+public struct TSAdaptationField: Equatable, Sendable, LogContextReadable {
   static let minimumLength: UInt8 = 2
   static let maximumLength: UInt8 = 184
   let length: UInt8
@@ -12,6 +14,17 @@ public struct TSAdaptationField: Equatable, Sendable {
   let byteRepresentation: ByteRepresentation
 
   let bytes: [UInt8]
+
+  public var logContext: LogContext {
+    LogContext {
+      $0["length"] = length
+      $0["pcr"] = pcr?.value
+      $0["opcr"] = opcr?.value
+      $0.setDebugDetail {
+        $0["randomAccess"] = randomAccessIndicator
+      }
+    }
+  }
 
   init(
     remainingDataLength: Int,

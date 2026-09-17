@@ -1,6 +1,6 @@
 import LogContext
 
-public struct TSProgramAssociationTable: Equatable, Sendable, LogContextReading {
+public struct TSProgramAssociationTable: Equatable, Sendable, LogContextReadable {
   public private(set) var versionNumber: UInt8
   public private(set) var programs: [UInt16: TSPID]
   public var logContext: LogContext {

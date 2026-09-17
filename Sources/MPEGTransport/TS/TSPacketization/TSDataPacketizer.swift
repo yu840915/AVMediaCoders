@@ -1,3 +1,7 @@
+import LogContext
+
+private let logger = Loggers.muxing.build()
+
 class TSDataPacketizer {
   let PID: TSPID
   private(set) var continuityCounter: UInt8
@@ -36,6 +40,12 @@ class TSDataPacketizer {
         adaptationFieldConfiguration: isStartOfPayload ? afConfig : nil,
         data: remainingData
       )
+      #if DEBUG_PACKETIZATION_IO
+        let context = packet.logContext.adding {
+          $0.addLabel(.debugPacketizationIO)
+        }
+        logger.debug("Packetized TS Packet \(context.debug)")
+      #endif
       packets.append(packet)
       isStartOfPayload = false
       continuityCounter = (continuityCounter + 1) & 0x0F

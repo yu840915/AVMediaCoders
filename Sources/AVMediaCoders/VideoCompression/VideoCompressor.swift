@@ -1,17 +1,21 @@
 @preconcurrency import Combine
+import DebugToolkit
 import LogContext
-import VideoToolbox
+import RemoteCameraCore
+@preconcurrency import VideoToolbox
 
 private let logger = Loggers.compressing.build()
 
 extension VideoCompressionConfiguration {
   var properties: [CFString: CFTypeRef] {
-    [
+    let limits: [NSNumber] = [NSNumber(value: bitrate), NSNumber(value: 1)]
+    return [
       kVTCompressionPropertyKey_RealTime: kCFBooleanTrue,
       kVTCompressionPropertyKey_AllowFrameReordering: kCFBooleanFalse,
       kVTCompressionPropertyKey_ExpectedFrameRate: frameRate as CFNumber,
       kVTCompressionPropertyKey_AverageBitRate: bitrate as CFNumber,
       kVTCompressionPropertyKey_MaxKeyFrameInterval: maxKeyFrameInterval as CFNumber,
+      kVTCompressionPropertyKey_DataRateLimits: limits as CFArray
     ]
   }
 
@@ -29,45 +33,64 @@ extension VideoCompressionConfiguration {
   }
 }
 
-public final class VideoCompressor: LogContextReading {
+public final class VideoCompressor: LogContextReadable, Sendable {
   let configuration: VideoCompressionConfiguration
-  fileprivate(set) var compressionSession: VTCompressionSession!
-  fileprivate let compressedBuffer$: PassthroughSubject<CMSampleBuffer, Never>
+  fileprivate nonisolated(unsafe) let compressionSession: VTCompressionSession
+  fileprivate let compressedBuffer$: PassthroughSubject<VideoFrame, Never>
   fileprivate let error$: PassthroughSubject<any Error, Never>
-  public let onCompressed: AnyPublisher<CMSampleBuffer, Never>
+  public let onCompressed: AnyPublisher<VideoFrame, Never>
   public let onError: AnyPublisher<any Error, Never>
   public let logContext: LogContext
+  private let dummy = LifecycleDummy {
+    $0.addLabel(.videoCompressor)
+  }
 
-  private init(configuration: VideoCompressionConfiguration) {
+  private init(
+    configuration: VideoCompressionConfiguration,
+    compressionSession: VTCompressionSession,
+  ) {
     self.configuration = configuration
-    compressedBuffer$ = PassthroughSubject<CMSampleBuffer, Never>()
+    self.compressionSession = compressionSession
+    compressedBuffer$ = PassthroughSubject<VideoFrame, Never>()
     error$ = PassthroughSubject<any Error, Never>()
     onCompressed = compressedBuffer$.eraseToAnyPublisher()
     onError = error$.eraseToAnyPublisher()
     logContext = LogContext {
       $0.addLabel(.videoCompressor)
     }
-    let context = configuration.logContext.adding {
-      $0.addLabel(.videoCompressor)
-    }
-    logger.info("Created \(context.info)")
   }
 
-  public func compress(sampleBuffer: CMSampleBuffer) {
-    guard let imageBuf = sampleBuffer.imageBuffer else {
+  deinit {
+    VTCompressionSessionInvalidate(compressionSession)
+  }
+
+  public func compress(_ frame: VideoFrame) {
+    guard let imageBuf = frame.buffer.imageBuffer else {
       let context = logContext
       logger.warning("Cannot get img buf \(context.warning)")
       return
     }
+
     var flags: VTEncodeInfoFlags = []
+    let imageOrientation = frame.imageOrientation
+    let inputDeviceDirection = frame.inputDeviceDirection
     let status = VTCompressionSessionEncodeFrame(
       compressionSession,
       imageBuffer: imageBuf,
-      presentationTimeStamp: sampleBuffer.presentationTimeStamp,
-      duration: sampleBuffer.duration,
+      presentationTimeStamp: frame.buffer.presentationTimeStamp,
+      duration: frame.buffer.duration,
       frameProperties: nil,
-      sourceFrameRefcon: nil,
       infoFlagsOut: &flags,
+      outputHandler: { [weak self] status, flags, sampleBuffer in
+        self?.processCompressorResult(
+          sourceFrameRefCon: nil,
+          status: status,
+          infoFlags: flags,
+          sampleBuffer: sampleBuffer,
+          imageOrientation: imageOrientation,
+          inputDeviceDirection: inputDeviceDirection,
+        )
+      }
     )
     if status != noErr {
       error$.send(AVMediaCodersError.framework(status))
@@ -78,7 +101,9 @@ public final class VideoCompressor: LogContextReading {
     sourceFrameRefCon: UnsafeMutableRawPointer?,
     status: OSStatus,
     infoFlags: VTEncodeInfoFlags,
-    sampleBuffer: CMSampleBuffer?
+    sampleBuffer: CMSampleBuffer?,
+    imageOrientation: ImageOrientation?,
+    inputDeviceDirection: DeviceDirection?,
   ) {
     guard status == noErr else {
       error$.send(AVMediaCodersError.framework(status))
@@ -92,12 +117,20 @@ public final class VideoCompressor: LogContextReading {
       error$.send(AVMediaCodersError.missingBuffer)
       return
     }
-    let context = logContext.adding {
-      $0.addLabel(.videoCodec)
-      $0["buffer"] = sampleBuffer.logContext
-    }
-    logger.trace("Compressed frame \(context.trace)")
-    compressedBuffer$.send(sampleBuffer)
+    #if DEBUG_MEDIA_DATA_IO
+      let context = logContext.adding {
+        $0.addLabels([.videoCodec, .debugMediaDataIO])
+        $0["buffer"] = sampleBuffer.logContext
+      }
+      logger.trace("Compressed frame \(context.trace)")
+    #endif
+    compressedBuffer$.send(
+      VideoFrame(
+        buffer: sampleBuffer,
+        imageOrientation: imageOrientation,
+        inputDeviceDirection: inputDeviceDirection
+      )
+    )
   }
 }
 
@@ -128,7 +161,6 @@ extension VideoCompressor {
     with configuration: VideoCompressionConfiguration
   ) throws -> VideoCompressor {
     var session: VTCompressionSession?
-    let compressor = VideoCompressor(configuration: configuration)
     var formatType = kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
     let attr =
       [
@@ -146,8 +178,8 @@ extension VideoCompressor {
           encoderSpecification: nil,
           imageBufferAttributes: attr,
           compressedDataAllocator: nil,
-          outputCallback: compressionOutbutCallback,
-          refcon: Unmanaged.passUnretained(compressor).toOpaque(),
+          outputCallback: nil,
+          refcon: nil,
           compressionSessionOut: &session,
         )
     )
@@ -180,37 +212,9 @@ extension VideoCompressor {
       $0.addLabel(.videoCompressor)
     }
     logger.debug("Configured session \(context.debug)")
-    compressor.compressionSession = session
-    return compressor
+    return VideoCompressor(configuration: configuration, compressionSession: session)
   }
 
-  static let compressionOutbutCallback: VTCompressionOutputCallback = {
-    (
-      outputCallbackRefCon: UnsafeMutableRawPointer?,
-      sourceFrameRefCon: UnsafeMutableRawPointer?,
-      status: OSStatus,
-      infoFlags: VTEncodeInfoFlags,
-      sampleBuffer: CMSampleBuffer?
-    ) in
-    let context = LogContext {
-      $0.addLabel(.videoCompressor)
-    }
-    guard let refcon: UnsafeMutableRawPointer = outputCallbackRefCon else {
-      logger.warning("Missing refcon \(context.warning)")
-      return
-    }
-    let ptr = Unmanaged<VideoCompressor>.fromOpaque(refcon)
-    guard let compressor = ptr.takeUnretainedValue() as VideoCompressor? else {
-      logger.warning("Missing compressor \(context.warning)")
-      return
-    }
-    compressor.processCompressorResult(
-      sourceFrameRefCon: sourceFrameRefCon,
-      status: status,
-      infoFlags: infoFlags,
-      sampleBuffer: sampleBuffer
-    )
-  }
 }
 
 extension CFNumber {

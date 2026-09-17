@@ -1,4 +1,5 @@
 @preconcurrency import Combine
+import DebugToolkit
 import LogContext
 import MPEGTransport
 import VideoToolbox
@@ -8,7 +9,7 @@ private let logger = Loggers.depacketizing.build()
 public protocol VideoStreamDepacketizing {
   var streamID: UInt8 { get }
   func depacketize(_ pesPacket: PESPacket)
-  var onOutputSampleBuffer: AnyPublisher<CMSampleBuffer, Never> { get }
+  var onOutputSampleBuffer: AnyPublisher<VideoFrame, Never> { get }
 }
 
 public func createVideoDepacketizer(
@@ -18,13 +19,16 @@ public func createVideoDepacketizer(
 }
 
 class VideoStreamDepacketizer: VideoStreamDepacketizing {
-  let outputSampleBuffer$ = PassthroughSubject<CMSampleBuffer, Never>()
+  let outputSampleBuffer$ = PassthroughSubject<VideoFrame, Never>()
   let streamID: UInt8
-  let onOutputSampleBuffer: AnyPublisher<CMSampleBuffer, Never>
+  let onOutputSampleBuffer: AnyPublisher<VideoFrame, Never>
   let depacketizer: VideoDepacketizer
   private var decoder: VideoDecompressor?
   let logContext: LogContext
   private var bag = Set<AnyCancellable>()
+  private let dummy = LifecycleDummy {
+    $0.addLabels(["VideoStreamDepacketizer"])
+  }
 
   init(streamID: UInt8) {
     self.streamID = streamID
@@ -34,16 +38,13 @@ class VideoStreamDepacketizer: VideoStreamDepacketizing {
       $0.addLabels(["Depacketizer", "VideoStream"])
       $0["streamID"] = "\(streamID)"
     }
-    let context = logContext
-    logger.info("Initialized \(context.info)")
   }
 
   func depacketize(_ pesPacket: PESPacket) {
     do {
-      let buffers = try depacketizer.depacketize(pesPacket)
-      for buffer in buffers {
-        // outputSampleBuffer$.send(buffer)
-        decode(buffer)
+      let frames = try depacketizer.depacketize(pesPacket)
+      for frame in frames {
+        decode(frame)
       }
     } catch {
       let context = logContext.adding {
@@ -54,17 +55,17 @@ class VideoStreamDepacketizer: VideoStreamDepacketizing {
   }
 
   func decode(
-    _ buffer: CMSampleBuffer
+    _ frame: VideoFrame
   ) {
     let context = logContext
     if let decoder {
       logger.trace("Will decode frame \(context.trace)")
-      decoder.decompress(buffer)
-    } else if let format = buffer.formatDescription {
+      decoder.decompress(frame)
+    } else if let format = frame.buffer.formatDescription {
       let decoder = try! VideoDecompressor.create(formatDescription: format)
       logger.trace("Set up decoder \(context.trace)")
       setUp(for: decoder)
-      decoder.decompress(buffer)
+      decoder.decompress(frame)
     }
   }
 
@@ -80,10 +81,10 @@ class VideoStreamDepacketizer: VideoStreamDepacketizing {
     self.bag = bag
   }
 
-  func send(_ buffer: CMSampleBuffer) {
+  func send(_ frame: VideoFrame) {
     let context = logContext
     logger.trace("Decoded frame into sample buffer \(context.trace)")
-    outputSampleBuffer$.send(buffer)
+    outputSampleBuffer$.send(frame)
   }
 
   func handle(_ error: any Error) {

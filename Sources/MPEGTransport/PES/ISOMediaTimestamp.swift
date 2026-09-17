@@ -1,9 +1,17 @@
-import CoreMedia
+import LogContext
 
-public struct ISOMediaTimestamp: Equatable {
+public struct ISOMediaTimestamp: Equatable, Sendable, LogContextReadable {
   let prefix: Prefix
   let value: UInt64
-  init(prefix: Prefix, truncating: UInt64) {
+
+  public var logContext: LogContext {
+    LogContext {
+      $0["prefix"] = prefix
+      $0["value"] = value
+    }
+  }
+
+  public init(prefix: Prefix, truncating: UInt64) {
     self.prefix = prefix
     value = truncating & 0x1_FFFF_FFFF
   }
@@ -45,14 +53,14 @@ public struct ISOMediaTimestamp: Equatable {
 }
 
 extension ISOMediaTimestamp {
-  static let videoTimeScale: CMTimeScale = 90000
-  static let audioTimeScale: CMTimeScale = 44100
+  static let videoTimeScale: Int32 = 90000
+  static let audioTimeScale: Int32 = 44100
 
-  public init(prefix: Prefix, time: CMTime, timeScale: CMTimeScale) {
+  public init(prefix: Prefix, time: MediaTimestamp, timeScale: Int32) {
     let converted: Int64
     let value = time.value
-    let toScale = CMTimeValue(timeScale)
-    let fromScale = CMTimeValue(time.timescale)
+    let toScale = Int64(timeScale)
+    let fromScale = Int64(time.scale)
     if value < fromScale && toScale < fromScale {
       converted = (value * toScale) / fromScale
     } else if toScale < fromScale {
@@ -66,24 +74,24 @@ extension ISOMediaTimestamp {
     )
   }
 
-  func toCMTime(timeScale: CMTimeScale) -> CMTime {
-    CMTime(value: Int64(value), timescale: timeScale)
+  func toMediaTimestamp(timeScale: Int32) -> MediaTimestamp {
+    MediaTimestamp(value: Int64(value), scale: timeScale)
   }
 
-  init(prefix: Prefix, videoTime: CMTime) {
+  init(prefix: Prefix, videoTime: MediaTimestamp) {
     self.init(prefix: prefix, time: videoTime, timeScale: Self.videoTimeScale)
   }
 
-  init(prefix: Prefix, audioTime: CMTime) {
+  init(prefix: Prefix, audioTime: MediaTimestamp) {
     self.init(prefix: prefix, time: audioTime, timeScale: Self.audioTimeScale)
   }
 
-  var videoCMTime: CMTime {
-    toCMTime(timeScale: Self.videoTimeScale)
+  var videoMediaTimestamp: MediaTimestamp {
+    toMediaTimestamp(timeScale: Self.videoTimeScale)
   }
 
-  var audioCMTime: CMTime {
-    toCMTime(timeScale: Self.audioTimeScale)
+  var audioMediaTimestamp: MediaTimestamp {
+    toMediaTimestamp(timeScale: Self.audioTimeScale)
   }
 }
 
@@ -92,5 +100,15 @@ extension ISOMediaTimestamp {
     case pts = 0b0010
     case ptsPrecedingDts = 0b0011
     case dts = 0b0001
+  }
+}
+
+extension ISOMediaTimestamp.Prefix: CustomStringConvertible {
+  public var description: String {
+    switch self {
+    case .pts: "PTS"
+    case .ptsPrecedingDts: "PTS preceding DTS"
+    case .dts: "DTS"
+    }
   }
 }

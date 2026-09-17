@@ -59,7 +59,7 @@ struct PESHeaderTests {
       scramblingControl: .notScrambling,
       isOriginal: false,
       ptsAndDts: .pts(
-        .init(value: 123_456_789, timescale: 90000)
+        .init(value: 123_456_789, scale: 90000)
       )
     )
 
@@ -83,7 +83,7 @@ struct PESHeaderTests {
       scramblingControl: .notScrambling,
       isOriginal: false,
       ptsAndDts: .pts(
-        .init(value: 123_456_789, timescale: 90000)
+        .init(value: 123_456_789, scale: 90000)
       )
     )
 
@@ -113,8 +113,8 @@ struct PESHeaderTests {
             scramblingControl: .notScrambling,
             isOriginal: true,
             ptsAndDts: .ptsAndDts(
-              pts: .init(seconds: 100, preferredTimescale: 90000),
-              dts: .init(seconds: 98, preferredTimescale: 90000)
+              pts: .init(value: 100, scale: 90000),
+              dts: .init(value: 98, scale: 90000)
             )
           )
         ),

@@ -18,4 +18,7 @@ extension LogContext.Label {
   static let videoCompressor = LogContext.Label(rawValue: "videoCompressor")
   static let videoDecompressor = LogContext.Label(rawValue: "videoDecompressor")
   static let videoCodec = LogContext.Label(rawValue: "videoCodec")
+
+  static let debugPacketizationIO = LogContext.Label(rawValue: "DEBUG_PACKETIZATION_IO")
+  static let debugMediaDataIO = LogContext.Label(rawValue: "DEBUG_MEDIA_DATA_IO")
 }

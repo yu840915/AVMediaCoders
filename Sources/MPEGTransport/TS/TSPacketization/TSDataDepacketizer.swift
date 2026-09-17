@@ -1,11 +1,15 @@
+import DebugToolkit
 import LogContext
 
 private let logger = Loggers.tsDepacketizing.build()
 
-class TSDataDepacketizer: LogContextReading {
+class TSDataDepacketizer: LogContextReadable {
   let PID: TSPID
   private(set) var stashedPackets: [TSPacket] = []
   private(set) var logContext: LogContext
+  private let dummy = LifecycleDummy {
+    $0.addLabel("Depacketizer")
+  }
 
   init(
     pid: TSPID,
@@ -17,8 +21,6 @@ class TSDataDepacketizer: LogContextReading {
       $0[.id] = "\(pid)"
       $0.addLabel("Depacketizer")
     }
-    let context = logContext
-    logger.info("Initialized  \(context.info)")
   }
 
   func feed(_ packets: [TSPacket]) -> [Output] {
@@ -29,17 +31,34 @@ class TSDataDepacketizer: LogContextReading {
     guard packet.header.pid == PID.value else {
       return nil
     }
+    var context = logContext.adding {
+      $0.setDebugDetail {
+        $0["packet"] = packet.logContext
+      }
+    }
     defer {
       logContext["stashed"] = "\(stashedPackets.count)"
     }
     if packet.header.isStartOfPayload {
+      #if DEBUG_PACKETIZATION_IO
+        context.addLabel(.debugPacketizationIO)
+        logger.debug("Handled Packet, should flush \(context.debug)")
+      #endif
       let output = flush()
       stashedPackets.append(packet)
       return output
     } else if !stashedPackets.isEmpty {
+      #if DEBUG_PACKETIZATION_IO
+        context.addLabel(.debugPacketizationIO)
+        logger.debug("Handled Packet, should append \(context.debug)")
+      #endif
       stashedPackets.append(packet)
       return nil
     } else {
+      #if DEBUG_PACKETIZATION_IO
+        context.addLabel(.debugPacketizationIO)
+        logger.notice("Handled Packet, should skip \(context.notice)")
+      #endif
       return nil
     }
   }
@@ -47,8 +66,11 @@ class TSDataDepacketizer: LogContextReading {
   func flush() -> Output? {
     var context = logContext
     guard !stashedPackets.isEmpty else {
-      context["reason"] = "no stashed packets"
-      logger.trace("Nothing to flush \(context.trace)")
+      #if DEBUG_PACKETIZATION_IO
+        context.addLabel(.debugPacketizationIO)
+        context["reason"] = "no stashed packets"
+        logger.trace("Nothing to flush \(context.trace)")
+      #endif
       return nil
     }
     defer {
@@ -65,12 +87,18 @@ class TSDataDepacketizer: LogContextReading {
         result.append(contentsOf: packet.payload.dataPayload)
       }
       if esData.isEmpty {
-        context["reason"] = "empty ES data"
-        logger.trace("Nothing to flush \(context.trace)")
+        #if DEBUG_PACKETIZATION_IO
+          context.addLabel(.debugPacketizationIO)
+          context["reason"] = "empty ES data"
+          logger.trace("Nothing to flush \(context.trace)")
+        #endif
         return nil
       }
-      context["esDataSize"] = "\(esData.count)"
-      logger.debug("Flushed \(context.debug)")
+      #if DEBUG_PACKETIZATION_IO
+        context.addLabel(.debugPacketizationIO)
+        context["esDataSize"] = esData.count.formattedSize
+        logger.debug("Flushed \(context.debug)")
+      #endif
       return Output(
         esData: esData,
         adaptationField: stashedPackets[0].payload.adaptationField
@@ -78,6 +106,12 @@ class TSDataDepacketizer: LogContextReading {
     } catch {
       let context = logContext.adding {
         $0.setError(error)
+        $0["counters"] = stashedPackets
+          .map { "\($0.header.continuityCounter)" }
+          .joined(separator: ",")
+        $0["starts"] = stashedPackets
+          .map { $0.header.isStartOfPayload ? "1" : "0" }
+          .joined()
       }
       logger.warning("Failed to flush \(context.warning)")
       return nil

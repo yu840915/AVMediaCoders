@@ -1,4 +1,6 @@
-public struct TSProgramMapTable: Equatable, Sendable {
+import LogContext
+
+public struct TSProgramMapTable: Equatable, Sendable, LogContextReadable {
   public let programNumber: UInt16
   public private(set) var versionNumber: UInt8
   public private(set) var PCRPID: TSPID
@@ -9,6 +11,19 @@ public struct TSProgramMapTable: Equatable, Sendable {
   }
   var audioElements: [TSProgramElementInfo] {
     programElementInfos.filter { $0.streamType.isAudio }
+  }
+
+  public var logContext: LogContext {
+    LogContext {
+      $0["progNum"] = programNumber
+      $0["ver"] = versionNumber
+      $0["videoElements"] = videoElements.map(\.logContext)
+      $0["audioElements"] = audioElements.map(\.logContext)
+      $0.setDebugDetail {
+        $0["PCRPID"] = PCRPID
+        $0["programInfo"] = programInfo
+      }
+    }
   }
 
   init(

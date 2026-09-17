@@ -1,4 +1,7 @@
-public enum HEVCNALUnitType: UInt8, Equatable {
+import LogContext
+import LogContextValueFormat
+
+public enum HEVCNALUnitType: UInt8, Equatable, Sendable {
   //Coded slice segment
   case trialN = 0
   case trailR = 1
@@ -67,10 +70,54 @@ extension HEVCNALUnitType {
     }
   }
 }
-public struct HEVCNALUnitHeader: Equatable {
+
+extension HEVCNALUnitType: CustomStringConvertible {
+  public var description: String {
+    switch self {
+    case .trialN: "TRAIL_N"
+    case .trailR: "TRAIL_R"
+    case .tsaN: "TSA_N"
+    case .tsaR: "TSA_R"
+    case .stsaN: "STSA_N"
+    case .stsaR: "STSA_R"
+    case .radlN: "RADL_N"
+    case .radlR: "RADL_R"
+    case .raslN: "RASL_N"
+    case .raslR: "RASL_R"
+    case .blaWLp: "BLA_W_LP"
+    case .blaWRadl: "BLA_W_RADL"
+    case .blaNLP: "BLA_N_LP"
+    case .idrWRadl: "IDR_W_RADL"
+    case .idrNLp: "IDR_N_LP"
+    case .cra: "CRA"
+    case .vps: "VPS"
+    case .sps: "SPS"
+    case .pps: "PPS"
+    case .aud: "AUD"
+    case .eos: "EOS"
+    case .eob: "EOB"
+    case .fillerData: "FILLER_DATA"
+    case .prefixSEI: "PREFIX_SEI"
+    case .suffixSEI: "SUFFIX_SEI"
+    case .unspecified: "UNSPECIFIED"
+    default: "RESERVED"
+    }
+  }
+}
+
+public struct HEVCNALUnitHeader: Equatable, Sendable, LogContextReadable {
   public let type: HEVCNALUnitType
   public let layerID: UInt8
   public let temporalIDPlus1: UInt8
+  public var logContext: LogContext {
+    LogContext {
+      $0["type"] = type
+      $0["layerID"] = layerID
+      $0["temporalID+1"] = temporalIDPlus1
+      $0["isKeyFrame"] = type.isKeyFrame
+      $0["isFormatDescription"] = type.isFormatDescription
+    }
+  }
 
   var bytes: [UInt8] {
     [type.rawValue << 1 | (layerID & 0b00111111) >> 5, layerID << 3 | temporalIDPlus1]
@@ -100,14 +147,24 @@ public struct HEVCNALUnitHeader: Equatable {
   }
 }
 
-public struct HEVCNALUnit {
+public struct HEVCNALUnit: Sendable, LogContextReadable {
   public let header: HEVCNALUnitHeader
+  public var type: HEVCNALUnitType {
+    header.type
+  }
   public let payload: [UInt8]
   public var isKeyFrame: Bool {
     header.type.isKeyFrame
   }
   public var isFormatDescription: Bool {
     header.type.isFormatDescription
+  }
+
+  public var logContext: LogContext {
+    LogContext {
+      $0["header"] = header.logContext
+      $0["size"] = payload.count.formattedSize
+    }
   }
 
   public var bytes: [UInt8] {

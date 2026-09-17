@@ -1,6 +1,6 @@
 import LogContext
 
-struct TSTableHeader: Equatable, Sendable, LogContextReading {
+struct TSTableHeader: Equatable, Sendable, LogContextReadable {
   let tableID: TableID
   var isPrivateSection: Bool {
     byteRepresentation.privateIndicator

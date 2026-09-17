@@ -1,4 +1,6 @@
-public struct TSPacket: Equatable, Sendable {
+import LogContext
+
+public struct TSPacket: Equatable, Sendable, LogContextReadable {
     let packetSize = 188
     let headerSize = 4
     let payloadSize = 184
@@ -6,6 +8,13 @@ public struct TSPacket: Equatable, Sendable {
     let payload: Payload
 
     public var bytes: [UInt8] { header.bytes + payload.bytes }
+
+    public var logContext: LogContext {
+        LogContext {
+            $0["header"] = header.logContext
+            $0["payload"] = payload.logContext
+        }
+    }
 
     init(
         PID: TSPID,
@@ -52,10 +61,26 @@ public struct TSPacket: Equatable, Sendable {
 }
 
 extension TSPacket {
-    enum Payload: Equatable, Sendable {
+    enum Payload: Equatable, Sendable, LogContextReadable {
         case adaptationField(TSAdaptationField)
         case dataPayload([UInt8])
         case both(TSAdaptationField, [UInt8])
+
+        public var logContext: LogContext {
+            LogContext {
+                $0["dataLength"] = dataPayloadLength
+                switch self {
+                case .adaptationField(let field):
+                    $0["type"] = "AdaptationField"
+                    $0["adaptationField"] = field.logContext
+                case .dataPayload(_):
+                    $0["type"] = "ESData"
+                case .both(let field, _):
+                    $0["type"] = "AdaptationField&ESData"
+                    $0["adaptationField"] = field.logContext
+                }
+            }
+        }
 
         var dataPayloadLength: Int {
             switch self {
@@ -128,29 +153,6 @@ extension TSPacket {
             self.pcr = pcr
             self.opcr = opcr
             self.allowRandomAccess = allowRandomAccess
-        }
-    }
-}
-
-extension TSPacket: CustomStringConvertible {
-    public var description: String {
-        """
-        TSPacket(
-            header: \(header),
-            payload: \(payload),
-        )
-        """
-    }
-}
-extension TSPacket.Payload: CustomStringConvertible {
-    public var description: String {
-        switch self {
-        case .adaptationField(let field):
-            return "AdaptationField: \(field)"
-        case .dataPayload(let data):
-            return "DataPayload(\(data.count))"
-        case .both(let field, let data):
-            return "AdaptationField: \(field), DataPayload(\(data.count))"
         }
     }
 }

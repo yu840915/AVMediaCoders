@@ -21,8 +21,13 @@ public protocol TSDemuxerOutputDelegate: AnyObject, Sendable {
   )
 }
 
-public actor TSDemuxer: LogContextReadingActor {
-  private let PATDepackitizer = TSDataDepacketizer(pid: .programAssociationTable)
+public actor TSDemuxer: LogContextReadableActor {
+  private let PATDepackitizer = TSDataDepacketizer(
+    pid: .programAssociationTable,
+    logContextBuilder: {
+      $0.addLabel("ProgramAssociationTable")
+    },
+  )
   private var currentDepacketizer: TSDataDepacketizer?
   private(set) var programAssociationTable: TSProgramAssociationTable = .init()
   private var PATSections: [TSProgramAssociationSection] = []
@@ -49,14 +54,22 @@ public actor TSDemuxer: LogContextReadingActor {
   }
 
   public func feed(_ packet: TSPacket) {
-    let context = logContext.adding {
+    var context = logContext.adding {
       $0["PID"] = "\(packet.header.PID)"
-      $0["action"] = "feed"
+      $0["task"] = "feed"
+      #if DEBUG_PACKETIZATION_IO
+        $0.addLabel(.debugPacketizationIO)
+      #endif
     }
+    #if DEBUG_PACKETIZATION_IO
+      logger.debug("Receiving TS Packet \(context.debug)")
+    #endif
     if let currentPID = currentDepacketizer?.PID,
       currentPID != packet.header.PID
     {
-      logger.debug("PID changed, will flush \(context.debug)")
+      #if DEBUG_PACKETIZATION_IO
+        logger.debug("PID changed, will flush \(context.debug)")
+      #endif
       flush()
     }
     guard let depacketizer = loadDepacketizer(forPID: packet.header.PID) else {
@@ -71,7 +84,7 @@ public actor TSDemuxer: LogContextReadingActor {
 
   public func flush() {
     var context = logContext.adding {
-      $0["action"] = "flush"
+      $0["task"] = "flush"
     }
     guard let depacketizer = currentDepacketizer else {
       logger.trace("No depacketier to flush \(context.trace)")
@@ -114,14 +127,17 @@ extension TSDemuxer {
 
   func handlePATOutput(_ output: TSDataDepacketizer.Output) {
     var context = logContext.adding {
-      $0["action"] = "handlePAT"
+      $0["task"] = "handlePAT"
     }
     do {
       let section = try TSProgramAssociationSection(bytes: output.esData)
       context["section"] = "\(section.logContext)"
       PATSections.append(section)
       if !section.isLastSection {
-        logger.debug("Appending PAT section \(context.debug)")
+        #if DEBUG_PACKETIZATION_IO
+          context.addLabel(.debugPacketizationIO)
+          logger.debug("Appending PAT section \(context.debug)")
+        #endif
         return
       }
       let sections = PATSections
@@ -130,7 +146,11 @@ extension TSDemuxer {
       if programAssociationTable == table {
         return
       }
-      logger.debug("Update PAT \(context.debug)")
+      #if DEBUG_PACKETIZATION_IO
+        context.addLabel(.debugPacketizationIO)
+        context["PAT"] = table.logContext
+        logger.debug("Update PAT \(context.debug)")
+      #endif
       programAssociationTable = table
       preparePMTDepacketizer()
       outputDelegate?.demuxer(self, didUpdateProgramAssociationTable: table)
@@ -142,7 +162,7 @@ extension TSDemuxer {
 
   func preparePMTDepacketizer() {
     let context = logContext.adding {
-      $0["action"] = "preparePMT"
+      $0["task"] = "preparePMT"
     }
     for program in programAssociationTable.programs {
       let PID = program.value
@@ -155,6 +175,7 @@ extension TSDemuxer {
         depacketizers[PID] = TSDataDepacketizer(
           pid: PID,
           logContextBuilder: {
+            $0.addLabel("ProgramMappingTable")
             $0.addLabels(labels)
           }
         )
@@ -166,18 +187,26 @@ extension TSDemuxer {
   }
 
   func handlePMTOutput(_ output: TSDataDepacketizer.Output, forPID PID: TSPID) {
+    var context = logContext.adding {
+      $0["PID"] = PID
+    }
     do {
       let section = try TSProgramMapSection(bytes: output.esData)
       let table = TSProgramMapTable(section: section)
       if programTables[PID] == table {
         return
       }
-      logger.debug("Update PMT over \(PID)")
+      #if DEBUG_PACKETIZATION_IO
+        context.addLabel(.debugPacketizationIO)
+        context["PMT"] = table.logContext
+        logger.debug("Update PMT \(context.debug)")
+      #endif
       programTables[PID] = table
       prepareProgramDepacketizer(from: table)
       outputDelegate?.demuxer(self, didUpdateProgramMapTable: table)
     } catch {
-      logger.warning("Failed to parse PMT for PID: \(PID), error: \(error)")
+      context.setError(error)
+      logger.warning("Failed to parse PMT \(context.warning)")
     }
   }
 
@@ -187,7 +216,12 @@ extension TSDemuxer {
         logger.debug(
           "Prepare depacketizer for ES of program(\(table.programNumber)) over \(stream.elementaryPID)"
         )
-        depacketizers[stream.elementaryPID] = TSDataDepacketizer(pid: stream.elementaryPID)
+        depacketizers[stream.elementaryPID] = TSDataDepacketizer(
+          pid: stream.elementaryPID,
+          logContextBuilder: {
+            $0.addLabel("ElementaryStream")
+          }
+        )
       }
     }
   }

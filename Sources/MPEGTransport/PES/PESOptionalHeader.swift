@@ -1,7 +1,7 @@
-import CoreMedia
+import LogContext
 
 /// PES Optional Header
-public struct PESHeaderExtension: Equatable, Sendable {
+public struct PESHeaderExtension: Equatable, Sendable, LogContextReadable {
   var scramblingControl: ScramblingControl {
     flags.scramblingControl
   }
@@ -18,6 +18,14 @@ public struct PESHeaderExtension: Equatable, Sendable {
   let flags: PESHeaderExtensionFlags
 
   public let bytes: [UInt8]
+
+  public var logContext: LogContext {
+    LogContext {
+      $0["scramblingControl"] = scramblingControl
+      $0["headerLength"] = flags.headerDataLength
+      $0["ptsAndDts"] = ptsAndDts.logContext
+    }
+  }
 
   public init(
     scramblingControl: ScramblingControl = .notScrambling,
@@ -64,8 +72,8 @@ extension PESHeaderExtension {
 
   public enum PtsAndDts: Equatable, Sendable {
     case none
-    case pts(CMTime)
-    case ptsAndDts(pts: CMTime, dts: CMTime)
+    case pts(MediaTimestamp)
+    case ptsAndDts(pts: MediaTimestamp, dts: MediaTimestamp)
 
     var bytes: [UInt8] {
       switch self {
@@ -76,21 +84,21 @@ extension PESHeaderExtension {
           + ISOMediaTimestamp(prefix: .dts, videoTime: dts).bytes
       }
     }
-    var pts: CMTime? {
+    var pts: MediaTimestamp? {
       return switch self {
       case .none: nil
       case .pts(let pts): pts
       case .ptsAndDts(let pts, _): pts
       }
     }
-    var dts: CMTime? {
+    var dts: MediaTimestamp? {
       return switch self {
       case .none, .pts: nil
       case .ptsAndDts(_, let dts): dts
       }
     }
 
-    public init(pts: CMTime, dts: CMTime) {
+    public init(pts: MediaTimestamp, dts: MediaTimestamp) {
       guard pts.isValid else {
         self = .none
         return
@@ -129,7 +137,7 @@ extension PESHeaderExtension.PtsAndDts {
     guard ts.prefix == .pts else {
       throw MPEGTransportError.invalidPES(.conflictingPtsDtsFlag)
     }
-    self = .pts(ts.videoCMTime)
+    self = .pts(ts.videoMediaTimestamp)
   }
 
   init(ptsAndDts: [UInt8]) throws {
@@ -141,7 +149,7 @@ extension PESHeaderExtension.PtsAndDts {
     guard dts.prefix == .dts else {
       throw MPEGTransportError.invalidPES(.conflictingPtsDtsFlag)
     }
-    self = .ptsAndDts(pts: pts.videoCMTime, dts: dts.videoCMTime)
+    self = .ptsAndDts(pts: pts.videoMediaTimestamp, dts: dts.videoMediaTimestamp)
   }
 }
 
@@ -226,5 +234,25 @@ struct PESHeaderExtensionFlags: Equatable {
     case none = 0b00
     case pts = 0b10
     case ptsAndDts = 0b11
+  }
+}
+
+extension PESHeaderExtension.PtsAndDts: LogContextReadable {
+  public var logContext: LogContext {
+    LogContext {
+      $0["pts"] = pts?.logContext
+      $0["dts"] = dts?.logContext
+    }
+  }
+}
+
+extension PESHeaderExtension.ScramblingControl: CustomStringConvertible {
+  public var description: String {
+    switch self {
+    case .notScrambling: "Not Scrambling"
+    case .reserved: "Reserved"
+    case .evenKeyScrambled: "Even Key Scrambled"
+    case .oddKeyScrambled: "Odd Key Scrambled"
+    }
   }
 }

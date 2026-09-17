@@ -1,8 +1,11 @@
 import CoreMedia
 import MPEGTransport
+import RemoteCameraCore
 
 public class HEVCSampleBufferComposer {
   private var formatDescription: CMFormatDescription?
+  private var deviceDirection: DeviceDirection?
+  private var imageOrientation: ImageOrientation?
   private var formatDescriptionBuilder: HEVCFormatDescriptionBuilder?
   private(set) var dts: CMTime?
   private(set) var pts: CMTime?
@@ -15,7 +18,7 @@ public class HEVCSampleBufferComposer {
     pts: CMTime?,
     dts: CMTime?
   ) throws
-    -> [CMSampleBuffer]
+    -> [VideoFrame]
   {
     self.pts = pts
     self.dts = dts
@@ -24,7 +27,7 @@ public class HEVCSampleBufferComposer {
 
   fileprivate func mergeSampleBuffers(
     from nalUnits: [HEVCNALUnit]
-  ) throws -> [CMSampleBuffer] {
+  ) throws -> [VideoFrame] {
     if nalUnits.isEmpty {
       return []
     }
@@ -40,10 +43,11 @@ public class HEVCSampleBufferComposer {
       return try extractFormatDescription(from: Array(nalUnits[lastSliceIndex...]))
     }
   }
+
   fileprivate func merge(
     _ nalUnits: [HEVCNALUnit],
     formatDescription: CMFormatDescription,
-  ) throws -> [CMSampleBuffer] {
+  ) throws -> [VideoFrame] {
     if nalUnits.isEmpty {
       return []
     }
@@ -56,7 +60,7 @@ public class HEVCSampleBufferComposer {
     _ nalUnit: HEVCNALUnit,
     formatDescription: CMFormatDescription,
   ) throws
-    -> CMSampleBuffer?
+    -> VideoFrame?
   {
     var bytes: [UInt8] = []
     let naluBytes = nalUnit.bytes
@@ -108,17 +112,27 @@ public class HEVCSampleBufferComposer {
       throw AVMediaCodersError.missingBuffer
     }
     if nalUnit.isKeyFrame {
-      let key = Unmanaged.passUnretained(kCMSampleAttachmentKey_DependsOnOthers).toOpaque()
-      let value = Unmanaged.passUnretained(kCFBooleanFalse).toOpaque()
-      sampleBuffer.configureAttachments {
-        CFDictionarySetValue($0, key, value)
-      }
+      sampleBuffer.configureAttachment(
+        kCFBooleanFalse,
+        forKey: kCMSampleAttachmentKey_DependsOnOthers,
+      )
+      sampleBuffer.configureAttachment(
+        kCFBooleanTrue,
+        forKey: kCMSampleBufferAttachmentKey_ResumeOutput,
+      )
     }
-    return sampleBuffer
+    sampleBuffer.configureAttachment(
+      kCFBooleanTrue,
+      forKey: kCMSampleAttachmentKey_DisplayImmediately,
+    )
+    return VideoFrame(
+      buffer: sampleBuffer,
+      imageOrientation: imageOrientation,
+      inputDeviceDirection: deviceDirection,
+    )
   }
 
-  fileprivate func extractFormatDescription(from nalUnits: [HEVCNALUnit]) throws -> [CMSampleBuffer]
-  {
+  fileprivate func extractFormatDescription(from nalUnits: [HEVCNALUnit]) throws -> [VideoFrame] {
     if nalUnits.isEmpty {
       return []
     }
@@ -126,13 +140,26 @@ public class HEVCSampleBufferComposer {
       nalUnits.firstIndex { !$0.isFormatDescription }
       ?? nalUnits.endIndex
     let formatNalus = Array(nalUnits[..<lastFormatIndex])
+    extractMotion(from: formatNalus)
+    let externalFormatNalus = formatNalus.filter { $0.internalSEIMessages.isEmpty }
     let builder = prepareBuilder()
-    builder.add(formatNalus)
+    builder.add(externalFormatNalus)
     if let format = try builder.build() {
       formatDescription = format
       formatDescriptionBuilder = nil
     }
     return try mergeSampleBuffers(from: Array(nalUnits[lastFormatIndex...]))
+  }
+
+  func extractMotion(from nalUnits: [HEVCNALUnit]) {
+    nalUnits.forEach { nalUnit in
+      if let deviceDirection = nalUnit.deviceDirection {
+        self.deviceDirection = deviceDirection
+      }
+      if let imageOrientation = nalUnit.imageOrientation {
+        self.imageOrientation = imageOrientation
+      }
+    }
   }
 
   fileprivate func prepareBuilder() -> HEVCFormatDescriptionBuilder {
@@ -193,8 +220,9 @@ class HEVCFormatDescriptionBuilder {
     parameterSets =
       parameterSets + [sps.bytes, pps.bytes] + seis.map { $0.bytes }
     var formatDescription: CMFormatDescription?
-    let parameterSetPointers = parameterSets.compactMap {
-      $0.withUnsafeBufferPointer { $0 }.baseAddress
+    let parameterSetsData = parameterSets.map { (Data($0) as NSData) }
+    let parameterSetPointers = parameterSetsData.map {
+      $0.bytes.assumingMemoryBound(to: UInt8.self)
     }
     guard parameterSetPointers.count == parameterSets.count else {
       return nil

@@ -1,4 +1,6 @@
-public struct TSProgramElementInfo: Equatable, Sendable {
+import LogContext
+
+public struct TSProgramElementInfo: Equatable, Sendable, LogContextReadable {
   public let streamType: TSStreamType
   public let elementaryPID: TSPID
   let byteRepresentation: ByteRepresentation
@@ -7,6 +9,15 @@ public struct TSProgramElementInfo: Equatable, Sendable {
   }
   var bytes: [UInt8] {
     byteRepresentation.bytes
+  }
+  public var logContext: LogContext {
+    LogContext {
+      $0["type"] = streamType
+      $0["pid"] = elementaryPID
+      $0.setDebugDetail {
+        $0["ESInfo"] = ESInfo
+      }
+    }
   }
 
   init(
@@ -136,6 +147,25 @@ public enum TSStreamType: Equatable, Sendable {
     case .audioATSCDolbyDigital: 0x87
     case .IPMP: 0x7F
     case .unsupported(let value): value
+    }
+  }
+}
+
+extension TSStreamType: CustomStringConvertible {
+  public var description: String {
+    switch self {
+    case .videoMPEG1: return "MPEG-1 Video"
+    case .videoMPEG2: return "MPEG-2 Video"
+    case .audioMPEG1: return "MPEG-1 Audio"
+    case .audioMPEG2HalvedSampleRate: return "MPEG-2 Audio (halved sample rate)"
+    case .subtitle: return "Subtitle"
+    case .mhegFeatures: return "MHEG Features"
+    case .audioADTSAAC: return "ADTS AAC Audio"
+    case .videoAVC: return "AVC Video"
+    case .videoHEVC: return "HEVC Video"
+    case .audioATSCDolbyDigital: return "ATSC Dolby Digital Audio"
+    case .IPMP: return "IPMP"
+    case .unsupported(let value): return "Unsupported Stream Type (\(value))"
     }
   }
 }

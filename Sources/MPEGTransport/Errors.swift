@@ -22,6 +22,7 @@ public enum PESError: Error, Equatable, Sendable {
   case headerDataTooShort
   case conflictingPtsDtsFlag
   case invalidStreamID
+  case invalidPacketLength
 }
 
 public enum TSError: Error, Equatable, Sendable {

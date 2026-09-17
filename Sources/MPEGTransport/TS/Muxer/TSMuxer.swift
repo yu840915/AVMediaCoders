@@ -6,7 +6,7 @@ public protocol TSMuxerOutputDelegate: AnyObject, Sendable {
   func muxer(_ muxer: TSMuxer, didOutputPackets packets: [TSPacket])
 }
 
-public actor TSMuxer: LogContextReadingActor {
+public actor TSMuxer: LogContextReadableActor {
   private let PATPacketizer = TSDataPacketizer(pid: .programAssociationTable)
   public private(set) var programAssociationTable: TSProgramAssociationTable
   private var programs: [UInt16: Program] = [:]
@@ -59,7 +59,7 @@ public actor TSMuxer: LogContextReadingActor {
     }
     let tablePID = TSPID.dataStream(streamID: tableID)
     for PID in allocatedPIDs {
-      if case let .dataStream(streamID) = PID {
+      if case .dataStream(let streamID) = PID {
         esPacketizers[streamID] = TSDataPacketizer(pid: PID)
       }
     }
@@ -84,8 +84,10 @@ public actor TSMuxer: LogContextReadingActor {
   }
 
   public func signalTable() {
-    let context = logContext
-    logger.trace("Signal tables \(context.trace)")
+    #if DEBUG_PACKETIZATION_IO
+      let context = logContext
+      logger.trace("Signal tables \(context.trace)")
+    #endif
     outputDelegate?.muxer(
       self,
       didOutputPackets: packetizePAT() + packetizePMTs()
@@ -98,15 +100,18 @@ public actor TSMuxer: LogContextReadingActor {
     forPID PID: TSPID
   ) throws {
     guard
-      case let .dataStream(streamID) = PID,
+      case .dataStream(let streamID) = PID,
       let packetizer = esPacketizers[streamID]
     else {
       throw MPEGTransportError.muxer(.dataStreamPIDMismatch)
     }
-    let context = logContext.adding {
-      $0["PID"] = "\(PID)"
-    }
-    logger.trace("Send data \(context.trace)")
+    #if DEBUG_PACKETIZATION_IO
+      let context = logContext.adding {
+        $0[.size] = esData.count.formattedSize
+        $0["PID"] = "\(PID)"
+      }
+      logger.trace("Send data \(context.trace)")
+    #endif
     outputDelegate?.muxer(
       self,
       didOutputPackets: packetizer.packetize(

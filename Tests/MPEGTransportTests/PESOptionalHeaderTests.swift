@@ -20,7 +20,7 @@ struct PESOptionalHeaderTests {
       scramblingControl: .notScrambling,
       isOriginal: false,
       ptsAndDts: .pts(
-        .init(value: 123_456_789, timescale: 90000)
+        .init(value: 123_456_789, scale: 90000)
       )
     )
 
@@ -44,8 +44,8 @@ struct PESOptionalHeaderTests {
       scramblingControl: .notScrambling,
       isOriginal: false,
       ptsAndDts: .ptsAndDts(
-        pts: .init(value: 123_456_789, timescale: 90000),
-        dts: .init(value: 42, timescale: 90000)
+        pts: .init(value: 123_456_789, scale: 90000),
+        dts: .init(value: 42, scale: 90000)
       )
     )
 
@@ -75,8 +75,8 @@ struct PESOptionalHeaderTests {
     let src = PESHeaderExtension(
       scramblingControl: .notScrambling,
       ptsAndDts: .ptsAndDts(
-        pts: .init(value: 123_456_789, timescale: 90000),
-        dts: .init(value: 42, timescale: 90000)
+        pts: .init(value: 123_456_789, scale: 90000),
+        dts: .init(value: 42, scale: 90000)
       )
     )
 

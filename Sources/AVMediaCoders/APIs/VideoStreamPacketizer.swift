@@ -1,4 +1,5 @@
 @preconcurrency import Combine
+import DebugToolkit
 import LogContext
 import MPEGTransport
 import VideoToolbox
@@ -7,7 +8,7 @@ private let logger = Loggers.packetizing.build()
 
 public protocol VideoStreamPacketizing {
   var streamID: UInt8 { get }
-  func packetize(_ sampleBuffer: CMSampleBuffer)
+  func packetize(_ frame: VideoFrame)
   var onOutputPES: AnyPublisher<PESPacket, Never> { get }
 }
 
@@ -23,7 +24,7 @@ public func createVideoPacketier(
   )
 }
 
-public struct VideoCompressionConfiguration: Sendable, LogContextReading {
+public struct VideoCompressionConfiguration: Sendable, LogContextReadable {
   public var width: Int
   public var height: Int
   public var codec: VideoCodec
@@ -67,6 +68,9 @@ class VideoStreamPacketizer: VideoStreamPacketizing {
   let packetizer: VideoPacketizer
   private var bag = Set<AnyCancellable>()
   let logContext: LogContext
+  private let dummy = LifecycleDummy {
+    $0.addLabels(["VideoStreamPacketizer"])
+  }
 
   init(
     streamID: UInt8,
@@ -79,21 +83,18 @@ class VideoStreamPacketizer: VideoStreamPacketizing {
       $0.addLabels(["Packetizer", "VideoStream"])
       $0["streamID"] = "\(streamID)"
     }
-    compressor.onCompressed.sink { [weak self] buffer in
-      self?.packetizeAndNotify(buffer)
+    compressor.onCompressed.sink { [weak self] frame in
+      self?.packetizeAndNotify(frame)
     }.store(in: &bag)
-    var context = logContext
-    context["config"] = configuration.logContext
-    logger.info("Initialized \(context.info)")
   }
 
-  func packetize(_ sampleBuffer: CMSampleBuffer) {
-    compressor.compress(sampleBuffer: sampleBuffer)
+  func packetize(_ frame: VideoFrame) {
+    compressor.compress(frame)
   }
 
-  private func packetizeAndNotify(_ sampleBuffer: CMSampleBuffer) {
+  private func packetizeAndNotify(_ frame: VideoFrame) {
     do {
-      let pesPackets = try packetizer.packetize(sampleBuffer, streamID: streamID)
+      let pesPackets = try packetizer.packetize(frame, streamID: streamID)
       pesPackets.forEach { onOutputPES$.send($0) }
     } catch {
       var context = logContext

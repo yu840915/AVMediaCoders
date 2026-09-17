@@ -1,4 +1,3 @@
-import CoreMedia
 import Testing
 
 @testable import MPEGTransport
@@ -48,21 +47,21 @@ struct ISOMediaTimestampTests {
 
   @Test
   func convertFromCMTime() async throws {
-    let time = CMTime(value: 123_456_789, timescale: 90000)
+    let time = MediaTimestamp(value: 123_456_789, scale: 90000)
 
     let sut = ISOMediaTimestamp(prefix: .pts, videoTime: time)
-    let restored = sut.videoCMTime
+    let restored = sut.videoMediaTimestamp
 
-    #expect(restored == CMTime(value: 123_456_789, timescale: 90000))
+    #expect(restored == MediaTimestamp(value: 123_456_789, scale: 90000))
   }
 
   @Test
   func convertFromCMTimeWithDifferentTimescale() async throws {
-    let time = CMTime(value: 42, timescale: 45000)
+    let time = MediaTimestamp(value: 42, scale: 45000)
 
     let sut = ISOMediaTimestamp(prefix: .pts, videoTime: time)
-    let restored = sut.videoCMTime
+    let restored = sut.videoMediaTimestamp
 
-    #expect(restored == CMTime(value: 84, timescale: 90000))
+    #expect(restored == MediaTimestamp(value: 84, scale: 90000))
   }
 }

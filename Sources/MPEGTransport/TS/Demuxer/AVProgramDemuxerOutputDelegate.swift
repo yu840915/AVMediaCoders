@@ -10,20 +10,48 @@ public final class AVProgramDemuxerOutputDelegate: TSDemuxerOutputDelegate {
   private let newProgram$: PassthroughSubject<AVProgramReader, Never>
   private let actor: DemuxerOutputDelegateActor
   private nonisolated(unsafe) var bag = Set<AnyCancellable>()
+  private let eventSink: AsyncStream<Event>.Continuation
+  private let eventTask: Task<Void, Never>
 
   public init(logContextBuilder: StructBuilder<LogContext>? = nil) async {
     newProgram$ = .init()
-    actor = DemuxerOutputDelegateActor(
+    let actor = DemuxerOutputDelegateActor(
       logContext: .init {
         logContextBuilder?(&$0)
         $0.addLabel("AVDemuxer")
       }
     )
+    self.actor = actor
+    let (events, eventSink) = AsyncStream<Event>.makeStream(
+      bufferingPolicy: .unbounded
+    )
+    self.eventSink = eventSink
+    eventTask = Task { [weak actor] in
+      for await event in events {
+        if Task.isCancelled { return }
+        guard let actor else { return }
+        switch event {
+        case .programMapTable(let table):
+          await actor.didUpdateProgramMapTable(table)
+        case .esData(let esData, let adaptationField, let PID):
+          await actor.didOutputESData(
+            esData,
+            adaptationField: adaptationField,
+            forPID: PID
+          )
+        }
+      }
+    }
     await actor.onNewProgram
       .sink { [weak self] program in
         self?.newProgram$.send(program)
       }
       .store(in: &bag)
+  }
+
+  deinit {
+    eventSink.finish()
+    eventTask.cancel()
   }
 
   public func demuxer(
@@ -36,12 +64,7 @@ public final class AVProgramDemuxerOutputDelegate: TSDemuxerOutputDelegate {
     _ demuxer: TSDemuxer,
     didUpdateProgramMapTable table: TSProgramMapTable,
   ) {
-    Task { [weak actor] in
-      await actor?.demuxer(
-        demuxer,
-        didUpdateProgramMapTable: table,
-      )
-    }
+    eventSink.yield(.programMapTable(table))
   }
 
   public func demuxer(
@@ -50,15 +73,17 @@ public final class AVProgramDemuxerOutputDelegate: TSDemuxerOutputDelegate {
     adaptationField: TSAdaptationField?,
     forPID PID: TSPID,
   ) {
-    Task { [weak actor] in
-      await actor?.demuxer(
-        demuxer,
-        didOutputESData: esData,
-        adaptationField: adaptationField,
-        forPID: PID,
-      )
-    }
+    eventSink.yield(
+      .esData(esData: esData, adaptationField: adaptationField, PID: PID)
+    )
+  }
+}
 
+extension AVProgramDemuxerOutputDelegate {
+  /// Both callback kinds share one queue so their relative order is preserved.
+  enum Event: Sendable {
+    case programMapTable(TSProgramMapTable)
+    case esData(esData: [UInt8], adaptationField: TSAdaptationField?, PID: TSPID)
   }
 }
 
@@ -77,10 +102,7 @@ actor DemuxerOutputDelegateActor {
     self.logContext = logContext
   }
 
-  public func demuxer(
-    _ demuxer: TSDemuxer,
-    didUpdateProgramMapTable table: TSProgramMapTable,
-  ) {
+  func didUpdateProgramMapTable(_ table: TSProgramMapTable) {
     if let program = programs[table.programNumber] {
       program.updateTable(table)
       connectStreams(with: table, for: program)
@@ -113,9 +135,8 @@ actor DemuxerOutputDelegateActor {
     }
   }
 
-  public func demuxer(
-    _ demuxer: TSDemuxer,
-    didOutputESData esData: [UInt8],
+  func didOutputESData(
+    _ esData: [UInt8],
     adaptationField: TSAdaptationField?,
     forPID PID: TSPID,
   ) {

@@ -68,7 +68,7 @@ struct TSProgramAssociationSection: TSTableSection {
   }
 }
 
-extension TSProgramAssociationSection: LogContextReading {
+extension TSProgramAssociationSection: LogContextReadable {
   var logContext: LogContext {
     LogContext {
       $0[.id] = "PATSection"
@@ -171,7 +171,7 @@ extension TSProgramAssociationSection {
     }
   }
 
-  struct TSPIDEntry: Equatable, Sendable, LogContextReading {
+  struct TSPIDEntry: Equatable, Sendable, LogContextReadable {
     var byteLength: UInt8 { 4 }
     let programNumber: UInt16
     let PID: TSPID

@@ -27,7 +27,7 @@ struct PESPacketTests {
           scramblingControl: .notScrambling,
           isOriginal: false,
           ptsAndDts: .pts(
-            .init(value: 123_456_789, timescale: 90000)
+            .init(value: 123_456_789, scale: 90000)
           )
         )
       ),
@@ -58,8 +58,8 @@ struct PESPacketTests {
             scramblingControl: .notScrambling,
             isOriginal: true,
             ptsAndDts: .ptsAndDts(
-              pts: .init(seconds: 100, preferredTimescale: 90000),
-              dts: .init(seconds: 98, preferredTimescale: 90000)
+              pts: .init(value: 100, scale: 90000),
+              dts: .init(value: 98, scale: 90000)
             )
           )
         ),
@@ -83,6 +83,81 @@ struct PESPacketTests {
     ]
 
     #expect(throws: MPEGTransportError.bufferTooShort) {
+      try PESPacket(bytes: bytes)
+    }
+  }
+
+  @Test
+  func encodeOversizedVideoPayloadAsUnbounded() async throws {
+    let payload = [UInt8](repeating: 0xAB, count: 200_000)
+    let sut = PESPacket(
+      streamType: .video(
+        streamID: 0,
+        extension: PESHeaderExtension(
+          ptsAndDts: .pts(.init(value: 123_456_789, scale: 90000))
+        )
+      ),
+      payload: payload
+    )
+
+    #expect(Array(sut.bytes[4...5]) == [0x00, 0x00])
+    #expect(sut.payload == payload)
+  }
+
+  @Test
+  func decodeUnboundedPayload() async throws {
+    let payload = [UInt8](repeating: 0xAB, count: 200_000)
+    let src = PESPacket(
+      streamType: .video(
+        streamID: 0,
+        extension: PESHeaderExtension(
+          ptsAndDts: .ptsAndDts(
+            pts: .init(value: 100, scale: 90000),
+            dts: .init(value: 98, scale: 90000)
+          )
+        )
+      ),
+      payload: payload
+    )
+
+    let sut = try PESPacket(bytes: src.bytes)
+
+    #expect(sut == src)
+    #expect(sut.payload.count == payload.count)
+  }
+
+  @Test
+  func encodeAtUnboundedBoundary() async throws {
+    let ext = PESHeaderExtension(
+      ptsAndDts: .pts(.init(value: 100, scale: 90000))
+    )
+    let exactPayload = [UInt8](repeating: 0x01, count: 0xFFFF - ext.bytes.count)
+
+    let bounded = PESPacket(
+      streamType: .video(streamID: 0, extension: ext),
+      payload: exactPayload
+    )
+    let unbounded = PESPacket(
+      streamType: .video(streamID: 0, extension: ext),
+      payload: exactPayload + [0x01]
+    )
+
+    #expect(Array(bounded.bytes[4...5]) == [0xFF, 0xFF])
+    #expect(try PESPacket(bytes: bounded.bytes) == bounded)
+    #expect(Array(unbounded.bytes[4...5]) == [0x00, 0x00])
+    #expect(try PESPacket(bytes: unbounded.bytes) == unbounded)
+  }
+
+  @Test
+  func detectPacketLengthShorterThanHeaderExtension() async throws {
+    let bytes: [UInt8] = [
+      0x00, 0x00, 0x01, 0xE1, 0x00, 0x01,
+      0x80, 0x80, 0x05,
+      0x21, 0x1D, 0x6F, 0x9A, 0x2B,
+      0xff, 0xff, 0xff,
+    ]
+
+    #expect(throws: MPEGTransportError.invalidPES(.invalidPacketLength)) {
       try PESPacket(bytes: bytes)
     }
   }

@@ -1,23 +1,46 @@
-import CoreMedia
+import LogContext
 
 //REF: https://dvd.sourceforge.net/dvdinfo/pes-hdr.html
 
-public struct PESHeader: Equatable, Sendable {
+public struct PESHeader: Equatable, Sendable, LogContextReadable {
+  static let unboundedPacketLength = 0
   let type: StreamType
   var pesPacketLength: UInt16 {
-    UInt16(byteFormat.pesPacketLength)
+    byteFormat.pesPacketLength
   }
-  var payloadLength: Int {
-    Int(pesPacketLength) - type.extensionBytes.count
+
+  /// A `PES_packet_length` of 0 means the packet is unbounded: its payload runs
+  /// to the end of the enclosing buffer, delimited by the next PES start code.
+  ///
+  /// ISO/IEC 13818-1 permits this only for video elementary streams, and it is
+  /// the standard escape hatch for access units larger than the 16-bit length
+  /// field can express (HEVC/H.264 IDR slices routinely exceed 64 KiB).
+  var isUnbounded: Bool {
+    pesPacketLength == 0
+  }
+
+  /// The declared payload length, or `nil` when the packet is unbounded and the
+  /// caller should consume the remainder of the buffer instead.
+  var payloadLength: Int? {
+    guard !isUnbounded else { return nil }
+    return Int(pesPacketLength) - type.extensionBytes.count
   }
   let byteFormat: MainPartByteFormat
   let bytes: [UInt8]
+  public var logContext: LogContext {
+    LogContext {
+      $0["type"] = type.logContext
+      $0["Length"] = pesPacketLength
+      $0["payloadLength"] = payloadLength.map { $0.formattedSize } ?? "unbounded"
+    }
+  }
 
-  init(type: StreamType, payloadLength: UInt16) {
+  init(type: StreamType, payloadLength: Int) {
     self.type = type
+    let packetLength = payloadLength + type.extensionBytes.count
     byteFormat = MainPartByteFormat(
       streamID: type.streamID,
-      pesPacketLength: payloadLength + UInt16(type.extensionBytes.count)
+      pesPacketLength: packetLength > Int(UInt16.max) ? 0 : UInt16(packetLength)
     )
     bytes = byteFormat.bytes + type.extensionBytes
   }
@@ -58,7 +81,7 @@ extension PESHeader {
       }
     }
 
-    var pts: CMTime? {
+    var pts: MediaTimestamp? {
       return switch self {
       case .privateStream1(let ext),
         .audio(_, let ext),
@@ -68,7 +91,7 @@ extension PESHeader {
       }
     }
 
-    var dts: CMTime? {
+    var dts: MediaTimestamp? {
       return switch self {
       case .privateStream1(let ext),
         .audio(_, let ext),
@@ -138,4 +161,27 @@ extension PESHeader {
     }
   }
 
+}
+
+extension PESHeader.StreamType: LogContextReadable {
+  public var logContext: LogContext {
+    LogContext {
+      switch self {
+      case .privateStream1:
+        $0["type"] = "Private Stream 1"
+      case .paddingStream:
+        $0["type"] = "Padding Stream"
+      case .privateStream2:
+        $0["type"] = "Private Stream 2"
+      case .audio(let streamID, let ext):
+        $0["type"] = "Audio Stream"
+        $0["streamID"] = streamID
+        $0["ext"] = ext.logContext
+      case .video(let streamID, let ext):
+        $0["type"] = "Video Stream"
+        $0["streamID"] = streamID
+        $0["ext"] = ext.logContext
+      }
+    }
+  }
 }

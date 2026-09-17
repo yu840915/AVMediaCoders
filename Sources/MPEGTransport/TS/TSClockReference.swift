@@ -30,7 +30,7 @@ public struct TSClockReference: Equatable, Sendable {
 }
 
 extension TSClockReference {
-  init(cmTime: CMTime) {
+  init(timestamp: MediaTimestamp) {
     //TODO: implement
     value = 0
     ext = 0

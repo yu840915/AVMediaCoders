@@ -1,4 +1,6 @@
-struct TSHeader: Equatable, Sendable {
+import LogContext
+
+struct TSHeader: Equatable, Sendable, LogContextReadable {
   let byteRepresentation: ByteRepresentation
   var isStartOfPayload: Bool {
     byteRepresentation.payloadUnitStartIndicator
@@ -15,6 +17,17 @@ struct TSHeader: Equatable, Sendable {
   }
   var bytes: [UInt8] {
     byteRepresentation.bytes
+  }
+
+  var logContext: LogContext {
+    LogContext {
+      $0["PID"] = PID
+      $0["counter"] = continuityCounter
+      $0.setDebugDetail {
+        $0["isStart"] = isStartOfPayload
+        $0["adaptationField"] = adaptationFieldControl
+      }
+    }
   }
 
   init(
@@ -121,5 +134,16 @@ extension TSHeader {
     case payloadOnly = 0b01
     case adaptationFieldOnly = 0b10
     case adaptationFieldAndPayload = 0b11
+  }
+}
+
+extension TSHeader.AdaptationFieldControl: CustomStringConvertible {
+  public var description: String {
+    switch self {
+    case .reserved: return "Reserved"
+    case .payloadOnly: return "Payload"
+    case .adaptationFieldOnly: return "Adaptation"
+    case .adaptationFieldAndPayload: return "Both"
+    }
   }
 }
